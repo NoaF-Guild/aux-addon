@@ -144,6 +144,7 @@ The most advanced auction house addOn for the 3.3.5a client with some features m
 
 ## Usage
 ### General
+
 For the auction listings in the search, auctions and bids tabs the following shortcuts are available.
 - Double-click on a row with blue colored count to expand it.
 - Alt-left-click on the selected row for buyout/cancel.
@@ -155,19 +156,23 @@ For the auction listings in the search, auctions and bids tabs the following sho
 - Right-click on a header of a price column to switch between unit and stack price.
 
 Furthermore
+
 - Double-click in editboxes will highlight everything.
 
 ### Search
+
 - Hitting tab in the search box will accept an autocompletion.
 - Dragging inventory items to the search box or right-clicking them will start a search.
 - Right-clicking item links will start a search.
 
 #### Search Results
+
 <img width="1157" height="708" alt="main win" src="https://github.com/user-attachments/assets/b58429a7-2be5-48d7-bc46-fb63c5051b53" />
 - Bid prices for your own active bids are colored in green.
 - Bid prices for other auctions with an active bid are colored in orange.
 
 #### Saved Searches
+
 <img width="1162" height="694" alt="saved" src="https://github.com/user-attachments/assets/58a91954-818d-4f86-841e-6c7c70f161ab" />
 - When hovering over an entry the tooltip shows a longer and more nicely formatted version.
 - Left-click on an entry will start a search.
@@ -176,11 +181,14 @@ Furthermore
 - Shift-right-click on an entry will add a search to the existing query in the search box.
 
 #### Filter Builder
+
 <img width="1156" height="708" alt="filter" src="https://github.com/user-attachments/assets/57db978f-bd6e-44cb-95e0-96aa74c60904" />
 While it is faster to type filters directly into the search box this sub-tab serves as a tutorial to learn how to formulate queries.
 The filters on the left side are Blizzard filters which may reduce the number of pages to be scanned and those on the right side are post filters which do not affect the scan time but can be combined with logical operators to formulate very complex filters.
 ### Post
+
 <img width="1157" height="710" alt="post" src="https://github.com/user-attachments/assets/b03a7619-d5e3-461d-80a8-8ffc9e4404c1" />
+
 - When entering prices **g**, **s** and **c** denote gold, silver and copper respectively.
 - A price value without explicit denotations will count as gold. (e.g., 10.5 = 10g50s)
 - Price values can contain decimals. (e.g., 1.5g = 1g50s)
@@ -191,8 +199,11 @@ The filters on the left side are Blizzard filters which may reduce the number of
 - Double-click in the bids/buyouts listings will also match the stack size.
 
 ### Auctions
+
 <img width="1162" height="710" alt="auctions" src="https://github.com/user-attachments/assets/e46c3418-5c50-442a-80be-62d9e88f3268" />
+
 ### Bids
+
 ![Alt text](http://i.imgur.com/NOjPKNW.png)
 
 ## Search Filters
