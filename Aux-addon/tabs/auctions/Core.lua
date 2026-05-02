@@ -41,34 +41,24 @@ function update_total_sold()
 			sold_total = sold_total + (price or 0)
 		end
 	end
-	local two_lines = sold_total > 0
+	local has_sold = sold_total > 0
 
-	-- Layout: when both lines are visible, keep them centered as a block.
-	-- When only one line is visible, keep it vertically centered.
-	if totals_frame then
+	if has_sold and total_post_text then
 		total_sold_text:ClearAllPoints()
-		if two_lines then
-			total_sold_text:SetPoint('TOPLEFT', totals_frame, 'TOPLEFT', 0, -3)
-			total_sold_text:SetPoint('TOPRIGHT', totals_frame, 'TOPRIGHT', 0, -3)
-		else
-			total_sold_text:SetPoint('LEFT', totals_frame, 'LEFT', 0, 0)
-			total_sold_text:SetPoint('RIGHT', totals_frame, 'RIGHT', 0, 0)
-		end
-	end
-
-	if two_lines then
+		total_sold_text:SetPoint('LEFT', totals_frame, 'LEFT', 0, 0)
+		total_sold_text:SetJustifyH('LEFT')
 		total_sold_text:SetText('Total sold: ' .. money.to_string(sold_total, true, true))
-		if total_post_text then
-			total_post_text:ClearAllPoints()
-			if totals_frame then
-				total_post_text:SetPoint('BOTTOMLEFT', totals_frame, 'BOTTOMLEFT', 0, 3)
-				total_post_text:SetPoint('BOTTOMRIGHT', totals_frame, 'BOTTOMRIGHT', 0, 3)
-			end
-			total_post_text:SetText('Total posted: ' .. money.to_string(posted_total, true, true))
-			total_post_text:Show()
-		end
+
+		total_post_text:ClearAllPoints()
+		total_post_text:SetPoint('RIGHT', totals_frame, 'RIGHT', 0, 0)
+		total_post_text:SetJustifyH('RIGHT')
+		total_post_text:SetText('Total posted: ' .. money.to_string(posted_total, true, true))
+		total_post_text:Show()
 	else
-		-- No sold auctions: show only posted in the first line.
+		total_sold_text:ClearAllPoints()
+		total_sold_text:SetPoint('LEFT', totals_frame, 'LEFT', 0, 0)
+		total_sold_text:SetPoint('RIGHT', totals_frame, 'RIGHT', 0, 0)
+		total_sold_text:SetJustifyH('LEFT')
 		total_sold_text:SetText('Total posted: ' .. money.to_string(posted_total, true, true))
 		if total_post_text then
 			total_post_text:SetText('')
