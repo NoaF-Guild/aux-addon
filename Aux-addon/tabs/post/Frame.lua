@@ -145,9 +145,6 @@ end
 do
 	item = gui.item(frame.parameters)
     item:SetPoint('TOPLEFT', 10, -6)
-	-- Allow drag & drop of items directly into the Post item slot.
-	-- NOTE: calling bare USE_ITEM() can collide with Blizzard's global USE_ITEM string.
-	-- Always call via module table to avoid resolving to _G.USE_ITEM.
 	item.button:SetScript('OnReceiveDrag', function()
 		local ctype, item_id, item_link = GetCursorInfo()
 		if ctype == 'item' then
@@ -159,7 +156,6 @@ do
 		end
 	end)
 	item.button:SetScript('OnMouseUp', function()
-		-- Also accept drop via mouse-up (some clients don't fire OnReceiveDrag reliably).
 		local ctype, item_id, item_link = GetCursorInfo()
 		if ctype == 'item' then
 			ClearCursor()

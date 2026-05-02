@@ -148,28 +148,34 @@ local function aux_extract_item(text)
 	end
 end
 
+local function aux_find_tab(name)
+	for _, t in ipairs(tab_info) do
+		if t.name == name then return t end
+	end
+end
+
 local function aux_route_use_item(item_id, suffix_id, name)
 	if not active_tab then return false end
 	local target = active_tab
 	if target.name ~= 'Post' and target.name ~= 'Search' then
-		for _, t in ipairs(tab_info) do
-			if t.name == 'Search' then target = t; break end
-		end
+		target = aux_find_tab('Search') or target
 	end
 	if not target or not target.USE_ITEM then return false end
-	if target.name == 'Post' then
-		if item_id and item_id > 0 then
-			target.USE_ITEM(item_id, suffix_id or 0)
+	if target.name == 'Post' and item_id and item_id > 0 then
+		if target.USE_ITEM(item_id, suffix_id or 0) then
 			return true
 		end
-		return false
+		target = aux_find_tab('Search')
+		if not target or not target.USE_ITEM then return false end
 	end
-	if not name and item_id and item_id > 0 then
-		name = GetItemInfo(item_id)
-	end
-	if name then
-		target.USE_ITEM(nil, nil, nil, nil, name)
-		return true
+	if target.name == 'Search' then
+		if not name and item_id and item_id > 0 then
+			name = GetItemInfo(item_id)
+		end
+		if name then
+			target.USE_ITEM(nil, nil, nil, nil, name)
+			return true
+		end
 	end
 	return false
 end
@@ -195,14 +201,31 @@ SetItemRef = vararg-function(arg)
 	end
 end
 
+local aux_orig_HandleModifiedItemClick = HandleModifiedItemClick
+
 HandleModifiedItemClick = vararg-function(arg)
-	if not (AuxFrame and AuxFrame:IsShown()) then return end
-	if not arg[1] or not strfind(arg[1], 'item:%-?%d+') then return end
-	if not (IsShiftKeyDown() or IsAltKeyDown()) then return end
-	local item_id, suffix_id, name = aux_extract_item(arg[1])
-	if item_id then
-		aux_route_use_item(item_id, suffix_id, name)
+	if (AuxFrame and AuxFrame:IsShown()) and arg[1] and (IsShiftKeyDown() or IsAltKeyDown()) and strfind(arg[1], 'item:%-?%d+') then
+		local item_id, suffix_id, name = aux_extract_item(arg[1])
+		if item_id and aux_route_use_item(item_id, suffix_id, name) then
+			return
+		end
 	end
+	return (aux_orig_HandleModifiedItemClick or nop)(unpack(arg))
+end
+
+local aux_orig_ChatEdit_InsertLink = ChatEdit_InsertLink
+
+ChatEdit_InsertLink = vararg-function(arg)
+	if (AuxFrame and AuxFrame:IsShown()) and arg[1] and strfind(arg[1], 'item:%-?%d+') then
+		local active_chat = ChatEdit_GetActiveWindow and ChatEdit_GetActiveWindow()
+		if not active_chat then
+			local item_id, suffix_id, name = aux_extract_item(arg[1])
+			if item_id and aux_route_use_item(item_id, suffix_id, name) then
+				return true
+			end
+		end
+	end
+	return (aux_orig_ChatEdit_InsertLink or nop)(unpack(arg))
 end
 
 M.orig = setmetatable({[_G]=T}, {__index=function(self, key) return self[_G][key] end})

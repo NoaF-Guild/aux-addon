@@ -261,10 +261,48 @@ local function ensure_buyout_popup()
 				dlg.noteText:SetText('Quantity is in items.')
 			end
 
+			local function ah_session_open()
+				if not (AuxFrame and AuxFrame:IsShown()) then return false end
+				local can = CanSendAuctionQuery()
+				return can ~= nil
+			end
+
 			local process_next
+			local function buy_at(s, r, q, index)
+				local pre_money = GetMoney()
+				place_bid('list', index, r.buyout_price, function()
+					if dlg.buyout_state ~= s then return end
+					if not ah_session_open() then
+						dlg.buyout_state = nil
+						dlg.in_progress = false
+						if buyoutBtn.Enable then buyoutBtn:Enable() end
+						return
+					end
+					local delta = pre_money - GetMoney()
+					if delta <= 0 then
+						s.i = s.i + 1
+						update_ui()
+						return process_next()
+					end
+					s.spent = s.spent + delta
+					s.bought = s.bought + min(s.remaining, q)
+					s.remaining = s.remaining - q
+					search.table:RemoveAuctionRecord(r)
+					s.i = s.i + 1
+					update_ui()
+					process_next()
+				end)
+			end
+
 			process_next = function()
 				local s = dlg.buyout_state
 				if not s then return end
+				if not ah_session_open() then
+					dlg.buyout_state = nil
+					dlg.in_progress = false
+					if buyoutBtn.Enable then buyoutBtn:Enable() end
+					return
+				end
 				if s.remaining <= 0 or s.i > getn(s.candidates) then
 					return finish()
 				end
@@ -289,6 +327,10 @@ local function ensure_buyout_popup()
 					return process_next()
 				end
 
+				if r.index and scan_util.test(r, r.index) then
+					return buy_at(s, r, q, r.index)
+				end
+
 				s.scan_id = scan_util.find(
 					r,
 					search.status_bar,
@@ -306,16 +348,7 @@ local function ensure_buyout_popup()
 							s.i = s.i + 1
 							return process_next()
 						end
-						place_bid('list', index, r.buyout_price, function()
-							if dlg.buyout_state ~= s then return end
-							s.spent = s.spent + (r.buyout_price or 0)
-							s.bought = s.bought + min(s.remaining, q)
-							s.remaining = s.remaining - q
-							search.table:RemoveAuctionRecord(r)
-							s.i = s.i + 1
-							update_ui()
-							process_next()
-						end)
+						buy_at(s, r, q, index)
 					end
 				)
 			end
