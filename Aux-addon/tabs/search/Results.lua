@@ -262,34 +262,63 @@ local function ensure_buyout_popup()
 			end
 
 			local function ah_session_open()
-				if not (AuxFrame and AuxFrame:IsShown()) then return false end
-				local can = CanSendAuctionQuery()
-				return can ~= nil
+				return AuxFrame and AuxFrame:IsShown() and true or false
+			end
+
+			local function find_in_listing(r)
+				if not r or not r.query_type then return end
+				local total = GetNumAuctionItems(r.query_type)
+				if not total or total <= 0 then return end
+				local origin = r.index or 1
+				if scan_util.test(r, origin) then return origin end
+				local span = max(origin, total - origin)
+				for offset = 1, span do
+					local lo = origin - offset
+					local hi = origin + offset
+					if lo >= 1 and scan_util.test(r, lo) then return lo end
+					if hi <= total and scan_util.test(r, hi) then return hi end
+				end
+			end
+
+			local function announce_buyout(r, qty, price)
+				local link = r and r.link
+				if not link and r and r.item_id then
+					link = '|cffffffff[item:' .. r.item_id .. ']|r'
+				end
+				local tex = r and r.texture and ('|T' .. r.texture .. ':0|t ') or ''
+				print(tex .. (link or '') .. ' Buyout x' .. qty .. ' for ' .. money.to_string(price, true, true))
 			end
 
 			local process_next
 			local function buy_at(s, r, q, index)
-				local pre_money = GetMoney()
-				place_bid('list', index, r.buyout_price, function()
+				place_bid('list', index, r.buyout_price, function(confirmed)
 					if dlg.buyout_state ~= s then return end
+					if not confirmed then
+						s.i = s.i + 1
+						update_ui()
+						if not ah_session_open() then
+							dlg.buyout_state = nil
+							dlg.in_progress = false
+							if buyoutBtn.Enable then buyoutBtn:Enable() end
+							return
+						end
+						return process_next()
+					end
+					local price = r.buyout_price or 0
+					local actual_q = min(s.remaining, q)
+					s.spent = s.spent + price
+					s.bought = s.bought + actual_q
+					s.remaining = s.remaining - q
+					search.table:RemoveAuctionRecord(r)
+					s.i = s.i + 1
+					update_ui()
+					announce_buyout(r, actual_q, price)
 					if not ah_session_open() then
 						dlg.buyout_state = nil
 						dlg.in_progress = false
 						if buyoutBtn.Enable then buyoutBtn:Enable() end
 						return
 					end
-					local delta = pre_money - GetMoney()
-					if delta <= 0 then
-						s.i = s.i + 1
-						update_ui()
-						return process_next()
-					end
-					s.spent = s.spent + delta
-					s.bought = s.bought + min(s.remaining, q)
-					s.remaining = s.remaining - q
-					search.table:RemoveAuctionRecord(r)
-					s.i = s.i + 1
-					update_ui()
 					process_next()
 				end)
 			end
@@ -327,8 +356,9 @@ local function ensure_buyout_popup()
 					return process_next()
 				end
 
-				if r.index and scan_util.test(r, r.index) then
-					return buy_at(s, r, q, r.index)
+				local local_index = find_in_listing(r)
+				if local_index then
+					return buy_at(s, r, q, local_index)
 				end
 
 				s.scan_id = scan_util.find(
