@@ -21,7 +21,7 @@ local function announce_bid_or_buyout(verb, r, qty, price)
 		link = '|cffffffff[item:' .. r.item_id .. ']|r'
 	end
 	local tex = r.texture and ('|T' .. r.texture .. ':0|t ') or ''
-	print(verb .. ' ' .. tex .. (link or '') .. ' x' .. (qty or 1) .. ' for ' .. money.to_string(price or 0, true, true))
+	DEFAULT_CHAT_FRAME:AddMessage(LIGHTYELLOW_FONT_COLOR_CODE .. '[Auction House]: ' .. verb .. ' ' .. tex .. (link or '') .. ' x' .. (qty or 1) .. ' for ' .. money.to_string(price or 0, true, true))
 end
 
 local function estimate_total_cost(seed_record, desired)
@@ -362,26 +362,16 @@ local function ensure_buyout_popup()
 					return buy_at(s, r, q, local_index)
 				end
 
-				s.scan_id = scan_util.find(
-					r,
-					search.status_bar,
-					function()
-						finish()
-					end,
-					function()
-						search.table:RemoveAuctionRecord(r)
-						s.i = s.i + 1
-						process_next()
-					end,
-					function(index)
-						if not scan_util.test(r, index) or not search.table:ContainsRecord(r) then
-							search.table:RemoveAuctionRecord(r)
-							s.i = s.i + 1
-							return process_next()
-						end
-						buy_at(s, r, q, index)
-					end
-				)
+				-- Candidate not present in the current local listing (already
+				-- bought, shifted off-page, or stale). Skip it instead of
+				-- issuing a fresh QueryAuctionItems from this OnUpdate-driven
+				-- chain: doing so taints the auction frame and produces
+				-- "Interface action failed because of an AddOn" on subsequent
+				-- buyouts. Remaining candidates that are still locally visible
+				-- continue to be bought normally.
+				search.table:RemoveAuctionRecord(r)
+				s.i = s.i + 1
+				return process_next()
 			end
 
 			if dlg.in_progress then return end

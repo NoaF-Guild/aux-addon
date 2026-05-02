@@ -17,7 +17,7 @@ local function announce_bid_or_buyout(verb, r, qty, price)
 		link = '|cffffffff[item:' .. r.item_id .. ']|r'
 	end
 	local tex = r.texture and ('|T' .. r.texture .. ':0|t ') or ''
-	print(verb .. ' ' .. tex .. (link or '') .. ' x' .. (qty or 1) .. ' for ' .. money.to_string(price or 0, true, true))
+	DEFAULT_CHAT_FRAME:AddMessage(LIGHTYELLOW_FONT_COLOR_CODE .. '[Auction House]: ' .. verb .. ' ' .. tex .. (link or '') .. ' x' .. (qty or 1) .. ' for ' .. money.to_string(price or 0, true, true))
 end
 
 auction_records = {}
