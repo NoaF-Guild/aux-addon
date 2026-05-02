@@ -259,8 +259,8 @@ do
 				if not confirmed and money - GetMoney() >= amount then
 					confirmed = true
 				end
-				do (on_success or nop)(confirmed) end
 				locked = false
+				do (on_success or nop)(confirmed) end
 			end)
 			thread(when, later(5), send_signal)
 			event_listener('CHAT_MSG_SYSTEM', function(kill)
@@ -299,12 +299,22 @@ end
 function LOAD2()
 	AuxFrame:SetScale(aux_scale)
 	if ChatFrame_AddMessageEventFilter then
-		local raw = ERR_AUCTION_WON_S or 'You won an auction for %s.'
-		local pos = strfind(raw, '%%s')
-		local prefix = pos and strsub(raw, 1, pos - 1) or 'You won an auction for '
-		local plen = strlen(prefix)
+		local won_raw = ERR_AUCTION_WON_S or 'You won an auction for %s.'
+		local won_pos = strfind(won_raw, '%%s')
+		local won_prefix = won_pos and strsub(won_raw, 1, won_pos - 1) or 'You won an auction for '
+		local wpl = strlen(won_prefix)
+		local bid_msgs = {
+			['Bid accepted.'] = true,
+			['Bid accepted'] = true,
+			['Your bid has been accepted.'] = true,
+		}
+		if ERR_AUCTION_BID_PLACED then
+			bid_msgs[ERR_AUCTION_BID_PLACED] = true
+		end
 		ChatFrame_AddMessageEventFilter('CHAT_MSG_SYSTEM', function(_, _, msg)
-			if msg and strsub(msg, 1, plen) == prefix then return true end
+			if not msg then return end
+			if strsub(msg, 1, wpl) == won_prefix then return true end
+			if bid_msgs[msg] then return true end
 		end)
 	end
 end
