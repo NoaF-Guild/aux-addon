@@ -21,7 +21,7 @@ _G.aux = {
 }
 
 M.print = vararg-function(arg)
-	DEFAULT_CHAT_FRAME:AddMessage(LIGHTYELLOW_FONT_COLOR_CODE .. '<aux> ' .. join(map(arg, tostring), ' '))
+	DEFAULT_CHAT_FRAME:AddMessage(LIGHTYELLOW_FONT_COLOR_CODE .. '[Auction House]: ' .. join(map(arg, tostring), ' '))
 end
 
 local event_frame = CreateFrame'Frame'

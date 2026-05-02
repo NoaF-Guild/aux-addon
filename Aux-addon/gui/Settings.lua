@@ -227,7 +227,7 @@ local function build()
 			_G.aux_items = {}
 			_G.aux_item_ids = {}
 			_G.aux_auctionable_items = {}
-			print('<aux> Item cache cleared.')
+			print('Item cache cleared.')
 		end)
 	end
 
