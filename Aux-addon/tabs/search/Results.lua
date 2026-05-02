@@ -20,7 +20,10 @@ local function announce_bid_or_buyout(verb, r, qty, price)
 	if not link and r.item_id then
 		link = '|cffffffff[item:' .. r.item_id .. ']|r'
 	end
-	local tex = r.texture and ('|T' .. r.texture .. ':0|t ') or ''
+	-- Render the item icon 2px taller than the chat line height.
+	local _, font_h = DEFAULT_CHAT_FRAME:GetFont()
+	local icon_h = floor((font_h or 14) + 2)
+	local tex = r.texture and ('|T' .. r.texture .. ':' .. icon_h .. ':' .. icon_h .. ':0:-1|t ') or ''
 	local verb_color = (verb == 'Buyout') and '|cff66ccff' or '|cffffd200'
 	DEFAULT_CHAT_FRAME:AddMessage('|cffffffff[Auction House]:|r ' .. verb_color .. verb .. '|r ' .. tex .. (link or '') .. ' x' .. (qty or 1) .. ' for ' .. money.to_string(price or 0, true, true))
 end
@@ -96,8 +99,13 @@ end
 		end
 		aux_buyout_popup.buyout_state = nil
 		aux_buyout_popup.in_progress = false
-		if aux_buyout_popup.buyoutBtn and aux_buyout_popup.buyoutBtn.Enable then
-			aux_buyout_popup.buyoutBtn:Enable()
+		if aux_buyout_popup.buyoutBtn then
+			if aux_buyout_popup.buyoutBtn.SetText then
+				aux_buyout_popup.buyoutBtn:SetText('Buyout')
+			end
+			if aux_buyout_popup.buyoutBtn.Enable then
+				aux_buyout_popup.buyoutBtn:Enable()
+			end
 		end
 		aux_buyout_popup:Hide()
 	end
@@ -233,6 +241,16 @@ local function ensure_buyout_popup()
 				dlg.costText:SetText('Total cost: ' .. money.to_string(s.spent, true, true))
 			end
 
+			local function set_continue_label()
+				local s = dlg.buyout_state
+				if not s or not buyoutBtn.SetText then return end
+				if s.bought > 0 then
+					buyoutBtn:SetText('Buy Another (' .. s.bought .. '/' .. s.qty .. ')')
+				else
+					buyoutBtn:SetText('Buyout')
+				end
+			end
+
 			local function finish()
 				local s = dlg.buyout_state
 				if not s then return end
@@ -244,6 +262,7 @@ local function ensure_buyout_popup()
 				end
 				dlg.buyout_state = nil
 				dlg.in_progress = false
+				if buyoutBtn.SetText then buyoutBtn:SetText('Buyout') end
 				if buyoutBtn.Enable then buyoutBtn:Enable() end
 			end
 
@@ -269,7 +288,7 @@ local function ensure_buyout_popup()
 				dlg.buyout_state = O('qty', qty, 'remaining', qty, 'bought', 0, 'spent', 0, 'i', 1, 'candidates', candidates)
 				dlg.progressText:SetText('Progress: 0 / ' .. qty .. ' items')
 				dlg.costText:SetText('Total cost: -')
-				dlg.noteText:SetText('Quantity is in items.')
+				dlg.noteText:SetText('Quantity is in items. Click Buyout per lot to avoid taint.')
 			end
 
 			local function ah_session_open()
@@ -291,88 +310,101 @@ local function ensure_buyout_popup()
 				end
 			end
 
-			local process_next
+			-- After place_bid resolves, update state and re-enable the button.
+			-- Each PlaceAuctionBid must originate from a hardware OnClick event
+			-- (the WoW client's auction protection is hardware-event scoped on
+			-- 3.3.5a; chaining from OnUpdate produces "Interface action failed
+			-- because of an AddOn"). So we wait for the next user click to
+			-- continue, mirroring Auctionator's "Buy Another" pattern.
 			local function buy_at(s, r, q, index)
 				place_bid('list', index, r.buyout_price, function(confirmed)
 					if dlg.buyout_state ~= s then return end
-					if not confirmed then
+					if confirmed then
+						local price = r.buyout_price or 0
+						local actual_q = min(s.remaining, q)
+						s.spent = s.spent + price
+						s.bought = s.bought + actual_q
+						s.remaining = s.remaining - q
+						search.table:RemoveAuctionRecord(r)
 						s.i = s.i + 1
 						update_ui()
-						if not ah_session_open() then
-							dlg.buyout_state = nil
-							dlg.in_progress = false
-							if buyoutBtn.Enable then buyoutBtn:Enable() end
-							return
-						end
-						return process_next()
+						announce_bid_or_buyout('Buyout', r, actual_q, price)
+					else
+						s.i = s.i + 1
+						update_ui()
 					end
-					local price = r.buyout_price or 0
-					local actual_q = min(s.remaining, q)
-					s.spent = s.spent + price
-					s.bought = s.bought + actual_q
-					s.remaining = s.remaining - q
-					search.table:RemoveAuctionRecord(r)
-					s.i = s.i + 1
-					update_ui()
-					announce_bid_or_buyout('Buyout', r, actual_q, price)
+
+					dlg.in_progress = false
 					if not ah_session_open() then
 						dlg.buyout_state = nil
-						dlg.in_progress = false
+						if buyoutBtn.SetText then buyoutBtn:SetText('Buyout') end
 						if buyoutBtn.Enable then buyoutBtn:Enable() end
 						return
 					end
-					process_next()
+					if s.remaining <= 0 or s.i > getn(s.candidates) then
+						return finish()
+					end
+					if buyoutBtn.Enable then buyoutBtn:Enable() end
+					set_continue_label()
+					dlg.noteText:SetText('Click Buyout to buy the next lot (' .. s.remaining .. ' remaining).')
 				end)
 			end
 
-			process_next = function()
+			-- Synchronously walk the candidate list inside this hardware
+			-- OnClick event, skipping invalid / stale entries (these don't
+			-- need PlaceAuctionBid so they don't taint), and fire exactly one
+			-- PlaceAuctionBid for the next valid candidate.
+			local function step_one_buyout()
 				local s = dlg.buyout_state
 				if not s then return end
 				if not ah_session_open() then
 					dlg.buyout_state = nil
 					dlg.in_progress = false
+					if buyoutBtn.SetText then buyoutBtn:SetText('Buyout') end
 					if buyoutBtn.Enable then buyoutBtn:Enable() end
 					return
 				end
-				if s.remaining <= 0 or s.i > getn(s.candidates) then
-					return finish()
-				end
-				local r = s.candidates[s.i]
-				if not r then return finish() end
-				local q = max(r.aux_quantity or 1, 1)
-				local unit = ceil((r.buyout_price or 0) / q)
-				local ref = ref_value(r.item_key)
-				if ref and ref > 0 and unit > ref * 3 and s.confirm_i ~= s.i then
-					s.confirm_i = s.i
-					local pct = floor(unit * 100 / ref + 0.5)
-					dlg.noteText:SetText('Warning: next auction is ' .. pct .. '% of Value. Click Buyout again to continue.')
-					update_ui()
-					dlg.in_progress = false
-					if buyoutBtn.Enable then buyoutBtn:Enable() end
-					return
-				end
-				s.confirm_i = nil
+				while true do
+					if s.remaining <= 0 or s.i > getn(s.candidates) then
+						return finish()
+					end
+					local r = s.candidates[s.i]
+					if not r then return finish() end
+					local q = max(r.aux_quantity or 1, 1)
+					local unit = ceil((r.buyout_price or 0) / q)
+					local ref = ref_value(r.item_key)
+					if ref and ref > 0 and unit > ref * 3 and s.confirm_i ~= s.i then
+						s.confirm_i = s.i
+						local pct = floor(unit * 100 / ref + 0.5)
+						dlg.noteText:SetText('Warning: next auction is ' .. pct .. '% of Value. Click Buyout again to continue.')
+						update_ui()
+						dlg.in_progress = false
+						if buyoutBtn.Enable then buyoutBtn:Enable() end
+						set_continue_label()
+						return
+					end
+					s.confirm_i = nil
 
-				if not search.table:ContainsRecord(r) or cache.is_player(r.owner) then
-					s.i = s.i + 1
-					return process_next()
+					if not search.table:ContainsRecord(r) or cache.is_player(r.owner) then
+						s.i = s.i + 1
+					else
+						local local_index = find_in_listing(r)
+						if local_index then
+							-- This is the only PlaceAuctionBid this click; we
+							-- are still inside the OnClick stack, so it runs
+							-- with hardware-event privileges.
+							dlg.in_progress = true
+							if buyoutBtn.Disable then buyoutBtn:Disable() end
+							if buyoutBtn.SetText then buyoutBtn:SetText('Waiting...') end
+							buy_at(s, r, q, local_index)
+							return
+						end
+						-- Stale / off-page candidate: skip without issuing a
+						-- fresh QueryAuctionItems (which would taint the AH).
+						search.table:RemoveAuctionRecord(r)
+						s.i = s.i + 1
+					end
 				end
-
-				local local_index = find_in_listing(r)
-				if local_index then
-					return buy_at(s, r, q, local_index)
-				end
-
-				-- Candidate not present in the current local listing (already
-				-- bought, shifted off-page, or stale). Skip it instead of
-				-- issuing a fresh QueryAuctionItems from this OnUpdate-driven
-				-- chain: doing so taints the auction frame and produces
-				-- "Interface action failed because of an AddOn" on subsequent
-				-- buyouts. Remaining candidates that are still locally visible
-				-- continue to be bought normally.
-				search.table:RemoveAuctionRecord(r)
-				s.i = s.i + 1
-				return process_next()
 			end
 
 			if dlg.in_progress then return end
@@ -380,9 +412,7 @@ local function ensure_buyout_popup()
 				start_state()
 			end
 			if not dlg.buyout_state then return end
-			dlg.in_progress = true
-			if buyoutBtn.Disable then buyoutBtn:Disable() end
-			process_next()
+			step_one_buyout()
 		end)
 end
 
