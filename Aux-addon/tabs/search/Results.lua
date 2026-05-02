@@ -21,7 +21,8 @@ local function announce_bid_or_buyout(verb, r, qty, price)
 		link = '|cffffffff[item:' .. r.item_id .. ']|r'
 	end
 	local tex = r.texture and ('|T' .. r.texture .. ':0|t ') or ''
-	DEFAULT_CHAT_FRAME:AddMessage(LIGHTYELLOW_FONT_COLOR_CODE .. '[Auction House]: ' .. verb .. ' ' .. tex .. (link or '') .. ' x' .. (qty or 1) .. ' for ' .. money.to_string(price or 0, true, true))
+	local verb_color = (verb == 'Buyout') and '|cff66ccff' or '|cffffd200'
+	DEFAULT_CHAT_FRAME:AddMessage('|cffffffff[Auction House]:|r ' .. verb_color .. verb .. '|r ' .. tex .. (link or '') .. ' x' .. (qty or 1) .. ' for ' .. money.to_string(price or 0, true, true))
 end
 
 local function estimate_total_cost(seed_record, desired)
