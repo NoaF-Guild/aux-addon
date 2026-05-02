@@ -16,7 +16,10 @@ local function announce_bid_or_buyout(verb, r, qty, price)
 	if not link and r.item_id then
 		link = '|cffffffff[item:' .. r.item_id .. ']|r'
 	end
-	local tex = r.texture and ('|T' .. r.texture .. ':0|t ') or ''
+	-- Render the item icon 2px taller than the chat line height.
+	local _, font_h = DEFAULT_CHAT_FRAME:GetFont()
+	local icon_h = floor((font_h or 14) + 2)
+	local tex = r.texture and ('|T' .. r.texture .. ':' .. icon_h .. ':' .. icon_h .. ':0:-1|t ') or ''
 	local verb_color = (verb == 'Buyout') and '|cff66ccff' or '|cffffd200'
 	DEFAULT_CHAT_FRAME:AddMessage('|cffffffff[Auction House]:|r ' .. verb_color .. verb .. '|r ' .. tex .. (link or '') .. ' x' .. (qty or 1) .. ' for ' .. money.to_string(price or 0, true, true))
 end
