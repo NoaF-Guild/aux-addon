@@ -252,16 +252,20 @@ do
 		PlaceAuctionBid(type, index, amount)
 		if money >= amount then
 			locked = true
-			local confirmed = false
+			local confirmed_by_chat = false
 			local send_signal, signal_received = signal()
 			thread(when, signal_received, function()
+				local confirmed = confirmed_by_chat
+				if not confirmed and money - GetMoney() >= amount then
+					confirmed = true
+				end
 				do (on_success or nop)(confirmed) end
 				locked = false
 			end)
 			thread(when, later(5), send_signal)
 			event_listener('CHAT_MSG_SYSTEM', function(kill)
-				if arg1 == ERR_AUCTION_BID_PLACED then
-					confirmed = true
+				if arg1 == ERR_AUCTION_BID_PLACED or arg1 == 'Bid accepted' then
+					confirmed_by_chat = true
 					send_signal()
 					kill()
 				end
