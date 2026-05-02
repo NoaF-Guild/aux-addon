@@ -114,12 +114,64 @@ end
 do
 	local index
 	function get_active_tab() return tab_info[index] end
+	function get_active_tab_index() return index end
 	function on_tab_click(i)
 		CloseDropDownMenus()
 		do (index and active_tab.CLOSE or nop)() end
 		index = i
 		do (index and active_tab.OPEN or nop)() end
+		local cd = aux.character[format('%s|%s', GetCVar'realmName', UnitName'player')]
+		if type(cd) == 'table' then
+			cd.last_tab = i
+		end
 	end
+end
+
+local function aux_extract_item(text)
+	if not text then return end
+	local item_id, suffix_id, name
+	if strfind(text, '^item:%d+') then
+		item_id = tonumber(select(3, strfind(text, '^item:(%d+)'))) or 0
+		suffix_id = tonumber(select(3, strfind(text, '^item:%-?%d+:%-?%d+:%-?%d+:%-?%d+:%-?%d+:%-?%d+:(%-?%d+)'))) or 0
+		name = GetItemInfo(text) or GetItemInfo(item_id)
+	elseif strfind(text, '|Hitem:%-?%d+') then
+		local pid, psuffix, _, _, pname = info.parse_link(text)
+		item_id = tonumber(pid) or 0
+		suffix_id = tonumber(psuffix) or 0
+		name = pname or GetItemInfo(text)
+		if not name and item_id > 0 then
+			name = GetItemInfo(item_id)
+		end
+	end
+	if item_id and item_id > 0 then
+		return item_id, suffix_id or 0, name
+	end
+end
+
+local function aux_route_use_item(item_id, suffix_id, name)
+	if not active_tab then return false end
+	local target = active_tab
+	if target.name ~= 'Post' and target.name ~= 'Search' then
+		for _, t in ipairs(tab_info) do
+			if t.name == 'Search' then target = t; break end
+		end
+	end
+	if not target or not target.USE_ITEM then return false end
+	if target.name == 'Post' then
+		if item_id and item_id > 0 then
+			target.USE_ITEM(item_id, suffix_id or 0)
+			return true
+		end
+		return false
+	end
+	if not name and item_id and item_id > 0 then
+		name = GetItemInfo(item_id)
+	end
+	if name then
+		target.USE_ITEM(nil, nil, nil, nil, name)
+		return true
+	end
+	return false
 end
 
 local aux_orig_SetItemRef = SetItemRef
@@ -128,26 +180,11 @@ SetItemRef = vararg-function(arg)
 	if not arg[1] then
 		return (aux_orig_SetItemRef or nop)(unpack(arg))
 	end
-	if (AuxFrame and AuxFrame:IsShown()) and (IsShiftKeyDown() or IsAltKeyDown()) and active_tab and active_tab.USE_ITEM and strfind(arg[1], '^item:%d+') then
-		if active_tab.name == 'Post' then
-			local item_id = tonumber(select(3, strfind(arg[1], '^item:(%d+)'))) or 0
-			local suffix_id = tonumber(select(3, strfind(arg[1], '^item:%d+:%d+:%d+:%d+:%d+:%d+:(-?%d+)'))) or 0
-			if item_id and item_id > 0 then
-				active_tab.USE_ITEM(item_id, suffix_id or 0)
-			end
-		else
-			local name = GetItemInfo(arg[1])
-			if not name then
-				local _, _, item_id = strfind(arg[1], '^item:(%d+)')
-				if item_id then
-					name = GetItemInfo(tonumber(item_id))
-				end
-			end
-			if name then
-				active_tab.USE_ITEM(nil, nil, nil, nil, name)
-			end
+	if (AuxFrame and AuxFrame:IsShown()) and (IsShiftKeyDown() or IsAltKeyDown()) and strfind(arg[1], 'item:%-?%d+') then
+		local item_id, suffix_id, name = aux_extract_item(arg[1])
+		if item_id and aux_route_use_item(item_id, suffix_id, name) then
+			return
 		end
-		return
 	end
 	if arg[3] ~= 'RightButton' or not index(active_tab, 'CLICK_LINK') or not strfind(arg[1], '^item:%d+') then
 		return (aux_orig_SetItemRef or nop)(unpack(arg))
@@ -160,32 +197,11 @@ end
 
 HandleModifiedItemClick = vararg-function(arg)
 	if not (AuxFrame and AuxFrame:IsShown()) then return end
-	if not arg[1] or not strfind(arg[1], 'item:%d+') then return end
-	if (IsShiftKeyDown() or IsAltKeyDown()) and active_tab and active_tab.USE_ITEM then
-		-- Post tab needs the *exact* item (id + suffix). Other tabs use the name.
-		if active_tab.name == 'Post' then
-			local item_id, suffix_id
-			if strfind(arg[1], '^item:%d+') then
-				item_id = tonumber(select(3, strfind(arg[1], '^item:(%d+)'))) or 0
-				suffix_id = tonumber(select(3, strfind(arg[1], '^item:%d+:%d+:%d+:%d+:%d+:%d+:(-?%d+)'))) or 0
-			else
-				item_id, suffix_id = info.parse_link(arg[1])
-			end
-			if item_id and item_id > 0 then
-				active_tab.USE_ITEM(item_id, suffix_id or 0)
-			end
-		else
-			local name
-			if strfind(arg[1], '^item:%d+') then
-				name = GetItemInfo(arg[1])
-			else
-				local _, _, _, _, parsed_name = info.parse_link(arg[1])
-				name = parsed_name
-			end
-			if name then
-				active_tab.USE_ITEM(nil, nil, nil, nil, name)
-			end
-		end
+	if not arg[1] or not strfind(arg[1], 'item:%-?%d+') then return end
+	if not (IsShiftKeyDown() or IsAltKeyDown()) then return end
+	local item_id, suffix_id, name = aux_extract_item(arg[1])
+	if item_id then
+		aux_route_use_item(item_id, suffix_id, name)
 	end
 end
 
@@ -258,7 +274,14 @@ end
 function AUCTION_HOUSE_SHOW()
 	AuctionFrame:Hide()
 	AuxFrame:Show()
-	on_tab_click(1)
+	local cd = aux.character[format('%s|%s', GetCVar'realmName', UnitName'player')] or empty
+	local desired = tonumber(cd.last_tab) or 1
+	if desired < 1 or desired > getn(tab_info) then desired = 1 end
+	if set_tab then
+		set_tab(desired)
+	else
+		on_tab_click(desired)
+	end
 end
 
 function AUCTION_HOUSE_CLOSED()
@@ -292,7 +315,7 @@ do
 		f:SetScript('OnMouseUp', function()
 			if arg1 == 'RightButton' then
 				if active_tab then
-					on_tab_click(1)
+					if set_tab then set_tab(1) else on_tab_click(1) end
 					search_tab.filter = _G[this:GetName() .. 'Name']:GetText() .. '/exact'
 					search_tab.execute(nil, false)
 				end

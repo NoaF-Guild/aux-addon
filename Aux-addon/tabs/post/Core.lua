@@ -119,7 +119,12 @@ function CLOSE()
 end
 
 function USE_ITEM(item_id, suffix_id)
-	select_item(item_id .. ':' .. suffix_id)
+	local key = item_id .. ':' .. suffix_id
+	select_item(key)
+	if not selected_item or selected_item.key ~= key then
+		update_inventory_records()
+		select_item(key)
+	end
 end
 
 function get_unit_start_price()

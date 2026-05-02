@@ -187,7 +187,17 @@ function full_scan()
 	start_list_scan({O('blizzard_query', T)}, 'Full Scan')
 end
 
-function fast_scan()
+local function fast_scan_on_auction(r)
+	if r and r.item_key and r.buyout_price and r.aux_quantity and r.buyout_price > 0 and r.aux_quantity > 0 then
+		local unit = ceil(r.buyout_price / r.aux_quantity)
+		local cur = history.fast_value(r.item_key)
+		if not cur or unit < cur then
+			history.set_fast_value(r.item_key, unit)
+		end
+	end
+end
+
+local function fast_scan_per_category()
 	local queries = T
 	local classes = T
 	for _, c in ipairs({GetAuctionItemClasses()}) do
@@ -206,16 +216,21 @@ function fast_scan()
 	start_list_scan(queries, 'Fast Scan', nil, nil, {
 		skip_history = true,
 		fast_extract = true,
-		on_auction = function(r)
-			if r and r.item_key and r.buyout_price and r.aux_quantity and r.buyout_price > 0 and r.aux_quantity > 0 then
-				local unit = ceil(r.buyout_price / r.aux_quantity)
-				local cur = history.fast_value(r.item_key)
-				if not cur or unit < cur then
-					history.set_fast_value(r.item_key, unit)
-				end
-			end
-		end,
+		on_auction = fast_scan_on_auction,
 	})
+end
+
+function fast_scan()
+	local can_query, can_query_all = CanSendAuctionQuery()
+	if can_query_all then
+		start_list_scan({O('blizzard_query', O('get_all', true))}, 'Fast Scan', nil, nil, {
+			skip_history = true,
+			fast_extract = true,
+			on_auction = fast_scan_on_auction,
+		})
+	else
+		fast_scan_per_category()
+	end
 end
 
 function OPEN()
