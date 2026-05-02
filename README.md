@@ -12,7 +12,7 @@ This fork adds multiple quality-of-life, safety, and stability improvements to t
 - UI scale slider (0.50 → 2.00) with numeric input
 - Added **Clear item cache** button (UI alternative to `/aux clear item cache`)
 
-<img width="360" height="410" alt="image" src="https://github.com/user-attachments/assets/21c8be4b-9be3-4730-b367-0862eb463662" width="360" height="410" alt="image" src="https://github.com/user-attachments/assets/f47c54dc-0c02-47a4-82de-aa1fce37d1b1" />
+<img width="360" height="410" alt="image" src="https://github.com/user-attachments/assets/21c8be4b-9be3-4730-b367-0862eb463662" alt="image" src="https://github.com/user-attachments/assets/f47c54dc-0c02-47a4-82de-aa1fce37d1b1" />
 
 
 
