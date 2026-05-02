@@ -252,14 +252,16 @@ do
 		PlaceAuctionBid(type, index, amount)
 		if money >= amount then
 			locked = true
+			local confirmed = false
 			local send_signal, signal_received = signal()
 			thread(when, signal_received, function()
-				do (on_success or nop)() end
+				do (on_success or nop)(confirmed) end
 				locked = false
 			end)
 			thread(when, later(5), send_signal)
 			event_listener('CHAT_MSG_SYSTEM', function(kill)
 				if arg1 == ERR_AUCTION_BID_PLACED then
+					confirmed = true
 					send_signal()
 					kill()
 				end
@@ -292,6 +294,15 @@ end
 
 function LOAD2()
 	AuxFrame:SetScale(aux_scale)
+	if ChatFrame_AddMessageEventFilter then
+		local raw = ERR_AUCTION_WON_S or 'You won an auction for %s.'
+		local pos = strfind(raw, '%%s')
+		local prefix = pos and strsub(raw, 1, pos - 1) or 'You won an auction for '
+		local plen = strlen(prefix)
+		ChatFrame_AddMessageEventFilter('CHAT_MSG_SYSTEM', function(_, _, msg)
+			if msg and strsub(msg, 1, plen) == prefix then return true end
+		end)
+	end
 end
 
 function AUCTION_HOUSE_SHOW()
