@@ -21,7 +21,7 @@ local function announce_bid_or_buyout(verb, r, qty, price)
 		link = '|cffffffff[item:' .. r.item_id .. ']|r'
 	end
 	local tex = r.texture and ('|T' .. r.texture .. ':0|t ') or ''
-	print(tex .. (link or '') .. ' ' .. verb .. ' x' .. (qty or 1) .. ' for ' .. money.to_string(price or 0, true, true))
+	print(verb .. ' ' .. tex .. (link or '') .. ' x' .. (qty or 1) .. ' for ' .. money.to_string(price or 0, true, true))
 end
 
 local function estimate_total_cost(seed_record, desired)
