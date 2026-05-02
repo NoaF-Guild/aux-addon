@@ -14,6 +14,16 @@ local gui = require 'aux.gui'
 local hide_buyout_popup
 local buyout_popup_hooked
 
+local function announce_bid_or_buyout(verb, r, qty, price)
+	if not r then return end
+	local link = r.link
+	if not link and r.item_id then
+		link = '|cffffffff[item:' .. r.item_id .. ']|r'
+	end
+	local tex = r.texture and ('|T' .. r.texture .. ':0|t ') or ''
+	print(tex .. (link or '') .. ' ' .. verb .. ' x' .. (qty or 1) .. ' for ' .. money.to_string(price or 0, true, true))
+end
+
 local function estimate_total_cost(seed_record, desired)
 	local search = current_search
 	if not search or not search.table or not seed_record or not desired then return end
@@ -280,15 +290,6 @@ local function ensure_buyout_popup()
 				end
 			end
 
-			local function announce_buyout(r, qty, price)
-				local link = r and r.link
-				if not link and r and r.item_id then
-					link = '|cffffffff[item:' .. r.item_id .. ']|r'
-				end
-				local tex = r and r.texture and ('|T' .. r.texture .. ':0|t ') or ''
-				print(tex .. (link or '') .. ' Buyout x' .. qty .. ' for ' .. money.to_string(price, true, true))
-			end
-
 			local process_next
 			local function buy_at(s, r, q, index)
 				place_bid('list', index, r.buyout_price, function(confirmed)
@@ -312,7 +313,7 @@ local function ensure_buyout_popup()
 					search.table:RemoveAuctionRecord(r)
 					s.i = s.i + 1
 					update_ui()
-					announce_buyout(r, actual_q, price)
+					announce_bid_or_buyout('Buyout', r, actual_q, price)
 					if not ah_session_open() then
 						dlg.buyout_state = nil
 						dlg.in_progress = false
@@ -822,10 +823,18 @@ do
 				if not record.high_bidder then
 					bid_button:SetScript('OnClick', function()
 						if scan_util.test(record, index) and search.table:ContainsRecord(record) then
-							place_bid('list', index, record.bid_price, record.bid_price < record.buyout_price and function()
-								info.bid_update(record)
-								search.table:SetDatabase()
-							end or function() search.table:RemoveAuctionRecord(record) end)
+							local is_buyout = record.bid_price >= record.buyout_price and record.buyout_price > 0
+							place_bid('list', index, record.bid_price, function(confirmed)
+								if confirmed then
+									announce_bid_or_buyout(is_buyout and 'Buyout' or 'Bid', record, record.aux_quantity or 1, record.bid_price)
+								end
+								if is_buyout then
+									search.table:RemoveAuctionRecord(record)
+								else
+									info.bid_update(record)
+									search.table:SetDatabase()
+								end
+							end)
 						end
 					end)
 					bid_button:Enable()
@@ -836,7 +845,12 @@ do
 				if record.buyout_price > 0 then
 					buyout_button:SetScript('OnClick', function()
 						if scan_util.test(record, index) and search.table:ContainsRecord(record) then
-							place_bid('list', index, record.buyout_price, function() search.table:RemoveAuctionRecord(record) end)
+							place_bid('list', index, record.buyout_price, function(confirmed)
+								if confirmed then
+									announce_bid_or_buyout('Buyout', record, record.aux_quantity or 1, record.buyout_price)
+								end
+								search.table:RemoveAuctionRecord(record)
+							end)
 						end
 					end)
 					buyout_button:Enable()
