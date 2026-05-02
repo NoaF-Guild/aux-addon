@@ -77,7 +77,19 @@ local function update_buyout_popup_cost()
 end
 
 	hide_buyout_popup = function()
-	if aux_buyout_popup then aux_buyout_popup:Hide() end
+	if aux_buyout_popup then
+		local s = aux_buyout_popup.buyout_state
+		if s then
+			if s.scan_id then scan.abort(s.scan_id) end
+			s.scan_id = nil
+		end
+		aux_buyout_popup.buyout_state = nil
+		aux_buyout_popup.in_progress = false
+		if aux_buyout_popup.buyoutBtn and aux_buyout_popup.buyoutBtn.Enable then
+			aux_buyout_popup.buyoutBtn:Enable()
+		end
+		aux_buyout_popup:Hide()
+	end
 	if aux_buyout_overlay then aux_buyout_overlay:Hide() end
 	end
 
@@ -198,6 +210,32 @@ local function ensure_buyout_popup()
 		buyoutBtn:SetScript('OnClick', function()
 			local search = current_search
 			if not search or not search.table or not search.table.records then return end
+
+			local function ref_value(item_key)
+				return history.fast_value(item_key) or history.value(item_key)
+			end
+
+			local function update_ui()
+				local s = dlg.buyout_state
+				if not s then return end
+				dlg.progressText:SetText('Progress: ' .. s.bought .. ' / ' .. s.qty .. ' items')
+				dlg.costText:SetText('Total cost: ' .. money.to_string(s.spent, true, true))
+			end
+
+			local function finish()
+				local s = dlg.buyout_state
+				if not s then return end
+				if s.remaining > 0 then
+					dlg.noteText:SetText('Quantity is in items. Not enough auctions to reach target.')
+				else
+					dlg.noteText:SetText('Buyout requested.')
+					hide_buyout_popup()
+				end
+				dlg.buyout_state = nil
+				dlg.in_progress = false
+				if buyoutBtn.Enable then buyoutBtn:Enable() end
+			end
+
 			local function start_state()
 				local record = dlg.record
 				if not record then return end
@@ -222,52 +260,74 @@ local function ensure_buyout_popup()
 				dlg.costText:SetText('Total cost: -')
 				dlg.noteText:SetText('Quantity is in items.')
 			end
-			local function ref_value(item_key)
-				return history.fast_value(item_key) or history.value(item_key)
-			end
-			local state = dlg.buyout_state
-			if not state then
-				start_state()
-				state = dlg.buyout_state
-			end
-			if not state then return end
-			local qty = state.qty
-			while state.remaining > 0 and state.i <= getn(state.candidates) do
-				local r = state.candidates[state.i]
-				if not r then break end
+
+			local process_next
+			process_next = function()
+				local s = dlg.buyout_state
+				if not s then return end
+				if s.remaining <= 0 or s.i > getn(s.candidates) then
+					return finish()
+				end
+				local r = s.candidates[s.i]
+				if not r then return finish() end
 				local q = max(r.aux_quantity or 1, 1)
 				local unit = ceil((r.buyout_price or 0) / q)
 				local ref = ref_value(r.item_key)
-				if ref and ref > 0 then
-					if unit > ref * 3 then
-						if state.confirm_i ~= state.i then
-							state.confirm_i = state.i
-							local pct = floor(unit * 100 / ref + 0.5)
-							dlg.noteText:SetText('Warning: next auction is ' .. pct .. '% of Value. Click Buyout again to continue.')
-							dlg.progressText:SetText('Progress: ' .. state.bought .. ' / ' .. qty .. ' items')
-							dlg.costText:SetText('Total cost: ' .. money.to_string(state.spent, true, true))
-							return
+				if ref and ref > 0 and unit > ref * 3 and s.confirm_i ~= s.i then
+					s.confirm_i = s.i
+					local pct = floor(unit * 100 / ref + 0.5)
+					dlg.noteText:SetText('Warning: next auction is ' .. pct .. '% of Value. Click Buyout again to continue.')
+					update_ui()
+					dlg.in_progress = false
+					if buyoutBtn.Enable then buyoutBtn:Enable() end
+					return
+				end
+				s.confirm_i = nil
+
+				if not search.table:ContainsRecord(r) or cache.is_player(r.owner) then
+					s.i = s.i + 1
+					return process_next()
+				end
+
+				s.scan_id = scan_util.find(
+					r,
+					search.status_bar,
+					function()
+						finish()
+					end,
+					function()
+						search.table:RemoveAuctionRecord(r)
+						s.i = s.i + 1
+						process_next()
+					end,
+					function(index)
+						if not scan_util.test(r, index) or not search.table:ContainsRecord(r) then
+							search.table:RemoveAuctionRecord(r)
+							s.i = s.i + 1
+							return process_next()
 						end
-						state.confirm_i = nil
+						place_bid('list', index, r.buyout_price, function()
+							if dlg.buyout_state ~= s then return end
+							s.spent = s.spent + (r.buyout_price or 0)
+							s.bought = s.bought + min(s.remaining, q)
+							s.remaining = s.remaining - q
+							search.table:RemoveAuctionRecord(r)
+							s.i = s.i + 1
+							update_ui()
+							process_next()
+						end)
 					end
-				end
-				PlaceAuctionBid('list', r.index, r.buyout_price)
-				state.spent = state.spent + (r.buyout_price or 0)
-				state.bought = state.bought + min(state.remaining, q)
-				state.remaining = state.remaining - q
-				search.table:RemoveAuctionRecord(r)
-				state.i = state.i + 1
-				dlg.progressText:SetText('Progress: ' .. state.bought .. ' / ' .. qty .. ' items')
-				dlg.costText:SetText('Total cost: ' .. money.to_string(state.spent, true, true))
+				)
 			end
-				if state.remaining > 0 then
-					dlg.noteText:SetText('Quantity is in items. Not enough auctions to reach target.')
-				else
-					-- Target reached: close the popup like the classic Aux behaviour.
-					dlg.noteText:SetText('Buyout requested.')
-					hide_buyout_popup()
-				end
-				dlg.buyout_state = nil
+
+			if dlg.in_progress then return end
+			if not dlg.buyout_state then
+				start_state()
+			end
+			if not dlg.buyout_state then return end
+			dlg.in_progress = true
+			if buyoutBtn.Disable then buyoutBtn:Disable() end
+			process_next()
 		end)
 end
 
