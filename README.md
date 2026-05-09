@@ -7,15 +7,15 @@ This fork adds multiple quality-of-life, safety, and stability improvements to t
 ### Added / Improved Features
 
 #### Options Window (`/aux`)
-- `/aux` now opens an in-game options window instead of chat-only configuration
+- `/aux` now uses the client configuration UI
 - All original slash-command options are available as checkboxes
 - UI scale slider (0.50 → 2.00) with numeric input
 - Added **Clear item cache** button (UI alternative to `/aux clear item cache`)
 
 <table>
   <tr>
-    <td><img width="360" height="410" alt="image1" src="https://github.com/user-attachments/assets/21c8be4b-9be3-4730-b367-0862eb463662" /></td>
-    <td><img width="360" height="410" alt="image2" src="https://github.com/user-attachments/assets/f47c54dc-0c02-47a4-82de-aa1fce37d1b1" /></td>
+    <td><img width="921" height="733" alt="image" src="https://github.com/user-attachments/assets/1abbb3f2-a4f5-479c-8b92-a652135fe494" />
+</td>
   </tr>
 </table>
 
