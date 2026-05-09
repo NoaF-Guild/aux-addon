@@ -193,7 +193,7 @@ The filters on the left side are Blizzard filters which may reduce the number of
 - A price value without explicit denotations will count as gold. (e.g., 10.5 = 10g50s)
 - Price values can contain decimals. (e.g., 1.5g = 1g50s)
 - Right-clicking an item in the inventory listing will start a search.
-- Right-clicking a bag item will select it in the listing.
+- **Alt+Left-click** or **Ctrl+Left-click** a bag item while Aux is open to route it to the active tab (Post = select for listing, Search = exact search). Plain right-click is never intercepted, so eating/drinking/equipping always works normally.
 - In the listing of bids/buyouts a red price is undercutting stack/unit price.
 - Clicking an entry in the in the listings of bids/buyouts of existing auctions will undercut with your bid stack/buyout unit price.
 - Double-click in the bids/buyouts listings will also match the stack size.
