@@ -177,7 +177,7 @@ function refresh_fonts(root, old_font, old_sizes)
 
 	local function safe_size(sz)
 		sz = tonumber(sz)
-		if not sz or sz <= 0 then
+		if not sz or sz < 1 then
 			return font_size.small
 		end
 		return sz
