@@ -23,14 +23,8 @@ local function handle_command(command)
 
 	-- When called without arguments, open the settings window.
 	if not command or command == '' then
-		-- Use the module system (do NOT rely on _G.aux, which is a saved-variable table
-		-- and gets replaced during initialization).
-		local settings = require 'aux.gui.settings'
-		if settings and settings.toggle then
-			settings.toggle()
-		else
-			print(color.red'Aux: settings UI not available')
-		end
+		InterfaceOptionsFrame_OpenToCategory("Aux")
+		InterfaceOptionsFrame_OpenToCategory("Aux")
 		return
 	end
 

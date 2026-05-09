@@ -10,7 +10,7 @@ do
 	_G.ContainerFrameItemButton_OnClick = vararg-function(arg)
 		local self = arg[1]
 		local button = arg[2]
-		if button == 'RightButton' and not get_modified() and get_tab() and AuxFrame and AuxFrame:IsShown() then
+		if button == 'RightButton' and not get_modified() and get_tab() and get_tab().name == 'Post' and AuxFrame and AuxFrame:IsShown() then
 			local bag = self:GetParent():GetID()
 			local slot = self:GetID()
 			local item_info = info.container_item(bag, slot)

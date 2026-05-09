@@ -5,236 +5,206 @@ include 'aux'
 
 local gui = require 'aux.gui'
 
-local frame
+-- Widget references for OnShow syncing
+local main_widgets = {}
 
 local function ensure_tooltip_settings()
-	-- Created in aux.core.slash:LOAD2(). If settings are opened early,
-	-- fall back to the persisted character table.
 	if not _G.tooltip_settings then
-		-- Ensure defaults exist (mirrors aux.core.tooltip).
 		_G.tooltip_settings = character_data('tooltip', { value = true, historical = true })
 	end
 end
 
 local function bool(v) return not not v end
 
-local function add_check(parent, y, text, getter, setter)
-	local cb = gui.checkbox(parent)
-	cb:SetPoint('TOPLEFT', 14, y)
-	cb:SetScript('OnClick', function()
-		setter(cb:GetChecked())
-	end)
-	local label = gui.label(cb, gui.font_size.small)
-	label:SetPoint('LEFT', cb, 'RIGHT', 6, 1)
-	label:SetText(text)
-	cb._refresh = function() cb:SetChecked(bool(getter())) end
-	return cb
-end
+function LOAD2()
+	ensure_tooltip_settings()
 
-local function add_scale(parent, y)
-	local slider = gui.slider(parent)
-	slider:SetPoint('TOPLEFT', 14, y)
+	-- =====================
+	-- Main Options Panel
+	-- =====================
+	local panel = CreateFrame("Frame", "AuxOptionsPanel", UIParent)
+	panel.name = "Aux"
+	panel:SetWidth(500)
+	panel:SetHeight(350)
+
+	-- Title
+	local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+	title:SetPoint("TOPLEFT", 16, -16)
+	title:SetText("Aux Options")
+
+	-- Helper to create a checkbox
+	local function create_check(name, label_text, getter, setter, anchor, y_offset)
+		local cb = CreateFrame("CheckButton", name, panel, "InterfaceOptionsSmallCheckButtonTemplate")
+		cb:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, y_offset or -8)
+		_G[cb:GetName() .. "Text"]:SetText(label_text)
+		cb:SetScript("OnClick", function()
+			setter(cb:GetChecked())
+		end)
+		tinsert(main_widgets, { type = "check", frame = cb, getter = getter })
+		return cb
+	end
+
+	-- Checkboxes
+	local cbIgnoreOwner = create_check("AuxOptionsCheckIgnoreOwner", "Ignore owner",
+		function() return _G.aux_ignore_owner end,
+		function(v) _G.aux_ignore_owner = v end,
+		title, -16)
+
+	local cbPostBid = create_check("AuxOptionsCheckPostBid", "Post bid",
+		function() return _G.aux_post_bid end,
+		function(v) _G.aux_post_bid = v end,
+		cbIgnoreOwner, -8)
+
+	local cbTooltipValue = create_check("AuxOptionsCheckTooltipValue", "Tooltip value",
+		function() return _G.tooltip_settings.value end,
+		function(v) _G.tooltip_settings.value = v end,
+		cbPostBid, -8)
+
+	local cbTooltipHistorical = create_check("AuxOptionsCheckTooltipHistorical", "Tooltip historical",
+		function() return _G.tooltip_settings.historical end,
+		function(v) _G.tooltip_settings.historical = v end,
+		cbTooltipValue, -8)
+
+	local cbTooltipMerchantBuy = create_check("AuxOptionsCheckTooltipMerchantBuy", "Tooltip merchant buy",
+		function() return _G.tooltip_settings.merchant_buy end,
+		function(v) _G.tooltip_settings.merchant_buy = v end,
+		cbTooltipHistorical, -8)
+
+	local cbTooltipMerchantSell = create_check("AuxOptionsCheckTooltipMerchantSell", "Tooltip merchant sell",
+		function() return _G.tooltip_settings.merchant_sell end,
+		function(v) _G.tooltip_settings.merchant_sell = v end,
+		cbTooltipMerchantBuy, -8)
+
+	local cbTooltipDisenchantValue = create_check("AuxOptionsCheckTooltipDisenchantValue", "Tooltip disenchant value",
+		function() return _G.tooltip_settings.disenchant_value end,
+		function(v) _G.tooltip_settings.disenchant_value = v end,
+		cbTooltipMerchantSell, -8)
+
+	local cbTooltipDisenchantDistribution = create_check("AuxOptionsCheckTooltipDisenchantDistribution", "Tooltip disenchant distribution",
+		function() return _G.tooltip_settings.disenchant_distribution end,
+		function(v) _G.tooltip_settings.disenchant_distribution = v end,
+		cbTooltipDisenchantValue, -8)
+
+	-- Scale slider
+	local slider = CreateFrame("Slider", "AuxOptionsScale", panel, "OptionsSliderTemplate")
+	slider:SetPoint("TOPLEFT", cbTooltipDisenchantDistribution, "BOTTOMLEFT", 0, -16)
 	slider:SetWidth(250)
+	slider:SetHeight(16)
 	slider:SetMinMaxValues(0.50, 2.00)
 	slider:SetValueStep(0.01)
-	slider.label:SetText('Scale')
+	_G[slider:GetName() .. "Low"]:SetText("0.50")
+	_G[slider:GetName() .. "High"]:SetText("2.00")
+	_G[slider:GetName() .. "Text"]:SetText("Scale")
+
+	local editBox = CreateFrame("EditBox", "AuxOptionsScaleEditBox", panel)
+	editBox:SetWidth(52)
+	editBox:SetHeight(20)
+	editBox:SetPoint("LEFT", slider, "RIGHT", 12, 0)
+	editBox:SetAutoFocus(false)
+	editBox:SetFontObject("GameFontHighlightSmall")
+	editBox:SetNumeric(false)
+	editBox:SetMaxLetters(6)
+	editBox:SetBackdrop({
+		bgFile = "Interface\\ChatFrame\\ChatFrameBackground",
+		edgeFile = "Interface\\ChatFrame\\ChatFrameBorder",
+		tile = true, tileSize = 16, edgeSize = 16,
+		insets = { left = 3, right = 3, top = 3, bottom = 3 }
+	})
+	editBox:SetBackdropColor(0, 0, 0, 0.5)
 
 	local updating
-	local function apply(v)
+	local function apply_scale(v)
 		v = tonumber(v)
 		if not v then return end
 		if v < 0.50 then v = 0.50 end
 		if v > 2.00 then v = 2.00 end
-		v = floor(v * 100 + 0.5) / 100
+		v = math.floor(v * 100 + 0.5) / 100
 		_G.aux_scale = v
 		if _G.AuxFrame then
 			AuxFrame:SetScale(v)
 		end
 		updating = true
-		slider.editbox:SetText(string.format('%.2f', v))
-		updating = false
-	end
-
-	slider:SetScript('OnValueChanged', function()
-		if updating then return end
-		apply(slider:GetValue())
-	end)
-
-	slider.editbox:SetNumeric(false)
-	slider.editbox:SetMaxLetters(6)
-	-- Use the same "change" convention as aux.gui.slider editboxes.
-	slider.editbox.change = function()
-		apply(this:GetText())
-		slider:SetValue(_G.aux_scale or 1)
-	end
-
-	slider._refresh = function()
-		local v = _G.aux_scale or 1
-		updating = true
+		editBox:SetText(string.format("%.2f", v))
 		slider:SetValue(v)
-		slider.editbox:SetText(string.format('%.2f', v))
 		updating = false
 	end
 
-	return slider
-end
-
-local function build()
-	ensure_tooltip_settings()
-
-	frame = CreateFrame('Frame', 'AuxSettingsFrame', UIParent)
-	gui.set_window_style(frame)
-	gui.set_size(frame, 360, 390)
-	frame:SetPoint('CENTER', UIParent, 'CENTER', 0, 0)
-	frame:SetToplevel(true)
-	frame:SetMovable(true)
-	frame:EnableMouse(true)
-	frame:SetClampedToScreen(true)
-	frame:RegisterForDrag('LeftButton')
-	frame:SetScript('OnDragStart', function() this:StartMoving() end)
-	frame:SetScript('OnDragStop', function() this:StopMovingOrSizing() end)
-
-		-- Allow closing the settings window with ESC (standard WoW behaviour).
-		if _G.UISpecialFrames then
-			for _, n in ipairs(_G.UISpecialFrames) do
-				if n == 'AuxSettingsFrame' then
-					frame._esc_registered = true
-					break
-				end
-			end
-			if not frame._esc_registered then
-				tinsert(_G.UISpecialFrames, 'AuxSettingsFrame')
-				frame._esc_registered = true
-			end
-		end
-	frame:Hide()
-
-	local title = gui.label(frame, gui.font_size.large)
-	title:SetPoint('TOPLEFT', 12, -10)
-		-- Use existing Aux color helpers (there is no color.white in this codebase).
-		title:SetText(color.text.enabled'Aux Options')
-
-	local close = gui.button(frame, gui.font_size.small)
-	gui.set_size(close, 60, 22)
-	close:SetPoint('TOPRIGHT', -8, -8)
-	close:SetText('Close')
-	close:SetScript('OnClick', function()
-		local focus = GetCurrentKeyBoardFocus and GetCurrentKeyBoardFocus() or nil
-		if focus and focus.ClearFocus and focus:IsObjectType('EditBox') then
-			focus:ClearFocus()
-		end
-		if frame._apply_fonts_now then frame._apply_fonts_now() end
-		frame:Hide()
+	slider:SetScript("OnValueChanged", function()
+		if updating then return end
+		apply_scale(slider:GetValue())
 	end)
 
-	local content = gui.panel(frame)
-	-- Leave extra room for the window title so tab labels don't overlap it.
-	content:SetPoint('TOPLEFT', 8, -56)
-	content:SetPoint('BOTTOMRIGHT', -8, 8)
+	editBox:SetScript("OnEnterPressed", function()
+		apply_scale(editBox:GetText())
+		editBox:ClearFocus()
+	end)
 
-	-- Tabs
-	local tabs = gui.tabs(content, 'UP')
-	tabs:create_tab('Options')
-	tabs:create_tab('Fonts')
+	editBox:SetScript("OnEditFocusLost", function()
+		apply_scale(editBox:GetText())
+	end)
 
-	local options_panel = CreateFrame('Frame', nil, content)
-	options_panel:SetPoint('TOPLEFT', 4, -8)
-	options_panel:SetPoint('BOTTOMRIGHT', -4, 4)
+	tinsert(main_widgets, { type = "slider", frame = slider, editbox = editBox, getter = function() return _G.aux_scale end })
 
-	local fonts_panel = CreateFrame('Frame', nil, content)
-	fonts_panel:SetPoint('TOPLEFT', 4, -8)
-	fonts_panel:SetPoint('BOTTOMRIGHT', -4, 4)
-	fonts_panel:Hide()
+	-- Clear Item Cache button
+	local btn = CreateFrame("Button", "AuxOptionsClearCache", panel, "UIPanelButtonTemplate")
+	btn:SetPoint("TOPLEFT", slider, "BOTTOMLEFT", 0, -24)
+	btn:SetWidth(140)
+	btn:SetHeight(22)
+	btn:SetText("Clear Item Cache")
+	btn:SetScript("OnClick", function()
+		_G.aux_items = {}
+		_G.aux_item_ids = {}
+		_G.aux_auctionable_items = {}
+		print("Item cache cleared.")
+	end)
 
-	local function show_panel(which)
-		options_panel:Hide()
-		fonts_panel:Hide()
-		if which == 'fonts' then
-			fonts_panel:Show()
-		else
-			options_panel:Show()
+	-- OnShow: sync all widgets with saved variables
+	panel:SetScript("OnShow", function()
+		ensure_tooltip_settings()
+		for _, w in ipairs(main_widgets) do
+			if w.type == "check" then
+				w.frame:SetChecked(bool(w.getter()))
+			elseif w.type == "slider" then
+				local v = w.getter() or 1
+				updating = true
+				w.frame:SetValue(v)
+				w.editbox:SetText(string.format("%.2f", v))
+				updating = false
+			end
 		end
+	end)
+
+	-- Default reset
+	panel.default = function()
+		_G.aux_ignore_owner = true
+		_G.aux_post_bid = nil
+		_G.aux_scale = 1
+		ensure_tooltip_settings()
+		_G.tooltip_settings.value = true
+		_G.tooltip_settings.historical = true
+		_G.tooltip_settings.merchant_buy = nil
+		_G.tooltip_settings.merchant_sell = nil
+		_G.tooltip_settings.disenchant_value = nil
+		_G.tooltip_settings.disenchant_distribution = nil
+		if _G.AuxFrame then
+			AuxFrame:SetScale(1)
+		end
+		panel:GetScript("OnShow")(panel)
 	end
 
-	tabs._on_select = function(id)
-		-- 1 = Options, 2 = Fonts
-		show_panel(id == 2 and 'fonts' or 'options')
-	end
-
-	-- Force initial select
-	tabs:select(1)
-
-	frame._widgets = {}
+	InterfaceOptions_AddCategory(panel)
 
 	-- =====================
-	-- Options panel
+	-- Fonts Panel
 	-- =====================
-	local y = -14
-	tinsert(frame._widgets, add_check(options_panel, y, 'Ignore owner',
-		function() return _G.aux_ignore_owner end,
-		function(v) _G.aux_ignore_owner = v end))
-	y = y - 26
+	local fontsPanel = CreateFrame("Frame", "AuxFontsPanel", UIParent)
+	fontsPanel.name = "Fonts"
+	fontsPanel.parent = "Aux"
+	fontsPanel:SetWidth(500)
+	fontsPanel:SetHeight(280)
 
-	tinsert(frame._widgets, add_check(options_panel, y, 'Post bid',
-		function() return _G.aux_post_bid end,
-		function(v) _G.aux_post_bid = v end))
-	y = y - 26
-
-	gui.horizontal_line(options_panel, y - 8)
-	y = y - 22
-
-	tinsert(frame._widgets, add_check(options_panel, y, 'Tooltip value',
-		function() return tooltip_settings.value end,
-		function(v) tooltip_settings.value = v end))
-	y = y - 26
-
-	tinsert(frame._widgets, add_check(options_panel, y, 'Tooltip historical',
-		function() return tooltip_settings.historical end,
-		function(v) tooltip_settings.historical = v end))
-	y = y - 26
-
-	tinsert(frame._widgets, add_check(options_panel, y, 'Tooltip merchant buy',
-		function() return tooltip_settings.merchant_buy end,
-		function(v) tooltip_settings.merchant_buy = v end))
-	y = y - 26
-
-	tinsert(frame._widgets, add_check(options_panel, y, 'Tooltip merchant sell',
-		function() return tooltip_settings.merchant_sell end,
-		function(v) tooltip_settings.merchant_sell = v end))
-	y = y - 26
-
-	tinsert(frame._widgets, add_check(options_panel, y, 'Tooltip disenchant value',
-		function() return tooltip_settings.disenchant_value end,
-		function(v) tooltip_settings.disenchant_value = v end))
-	y = y - 26
-
-	tinsert(frame._widgets, add_check(options_panel, y, 'Tooltip disenchant distribution',
-		function() return tooltip_settings.disenchant_distribution end,
-		function(v) tooltip_settings.disenchant_distribution = v end))
-	y = y - 36
-
-	gui.horizontal_line(options_panel, y + 10)
-
-	tinsert(frame._widgets, add_scale(options_panel, y - 18))
-
-	-- Clear item cache (same as: /aux clear item cache)
-	do
-		local btn = gui.button(options_panel, gui.font_size.small)
-		gui.set_size(btn, 140, 22)
-		btn:SetPoint('TOPLEFT', 14, y - 78)
-		btn:SetText('Clear Item Cache')
-		btn:SetScript('OnClick', function()
-			_G.aux_items = {}
-			_G.aux_item_ids = {}
-			_G.aux_auctionable_items = {}
-			print('Item cache cleared.')
-		end)
-	end
-
-	-- =====================
-	-- Fonts panel (LibSharedMedia-3.0)
-	-- =====================
 	local LSM = LibStub and LibStub('LibSharedMedia-3.0', true) or nil
+
 	local defaults = {
 		roles = {
 			title = { font_name = nil, size = gui.get_role_fonts().title.size, outline = 'NONE' },
@@ -245,10 +215,27 @@ local function build()
 	}
 	local fonts_data = character_data('fonts', defaults)
 
+	local font_widgets = {}
+	local rows = {
+		{ key = 'title', label = 'Title' },
+		{ key = 'text', label = 'Text' },
+		{ key = 'buttons', label = 'Buttons' },
+		{ key = 'numbers', label = 'Numbers' },
+	}
+
+	local font_list
+	if LSM then
+		font_list = LSM:List('font')
+		table.sort(font_list)
+	end
+
 	local function apply_fonts_now()
-		local old_font = gui.font
-		local old_sizes = { small = gui.font_size.small, medium = gui.font_size.medium, large = gui.font_size.large }
-		-- Apply per-role fonts
+		local old_font = gui.get_font()
+		local old_sizes = {
+			small = gui.font_size.small,
+			medium = gui.font_size.medium,
+			large = gui.font_size.large,
+		}
 		if fonts_data and fonts_data.roles then
 			for role, opts in pairs(fonts_data.roles) do
 				local path
@@ -258,63 +245,53 @@ local function build()
 				gui.set_role_font(role, path, opts.size, opts.outline)
 			end
 		end
-		-- Refresh existing UI (settings + aux)
-		gui.refresh_fonts(frame, old_font, old_sizes)
 		if _G.AuxFrame then
 			gui.refresh_fonts(AuxFrame, old_font, old_sizes)
 		end
-		-- Do not refresh UIParent: some Blizzard FontStrings report a 0 height which
-		-- causes SetFont() errors. Aux widgets are refreshed via AuxFrame.
 	end
-	frame._apply_fonts_now = apply_fonts_now
-
-	local header = gui.label(fonts_panel, gui.font_size.large)
-	header:SetPoint('TOPLEFT', 12, -10)
-	header:SetText(color.text.enabled'Fonts')
 
 	if not LSM then
-		local warn = gui.label(fonts_panel, gui.font_size.small)
-		warn:SetPoint('TOPLEFT', header, 'BOTTOMLEFT', 0, -12)
-		warn:SetText(color.text.disabled'LibSharedMedia-3.0 not found')
+		local warn = fontsPanel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+		warn:SetPoint("TOPLEFT", 16, -16)
+		warn:SetText("LibSharedMedia-3.0 not found")
 	else
-		local font_list = LSM:List('font')
-		table.sort(font_list)
-
-		local rows = {
-			{ key = 'title', label = 'Title' },
-			{ key = 'text', label = 'Text' },
-			{ key = 'buttons', label = 'Buttons' },
-			{ key = 'numbers', label = 'Numbers' },
-		}
-
-		local start_y = -38
+		local start_y = -16
 		local row_h = 58
 
-		local function make_row(i, row)
+		for i, row in ipairs(rows) do
 			local y = start_y - (i - 1) * row_h
 			local role_data = fonts_data.roles[row.key]
 
-			local lbl = gui.label(fonts_panel, gui.font_size.small)
-			lbl:SetPoint('TOPLEFT', 12, y)
+			local lbl = fontsPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+			lbl:SetPoint("TOPLEFT", 16, y)
 			lbl:SetText(row.label)
 
-			local dd = gui.dropdown(fonts_panel)
-			dd:SetPoint('TOPLEFT', lbl, 'BOTTOMLEFT', -16, -4)
-			gui.set_size(dd, 210, 26)
+			local dd = CreateFrame("Frame", "AuxFonts" .. row.key .. "DropDown", fontsPanel, "UIDropDownMenuTemplate")
+			dd:SetPoint("TOPLEFT", lbl, "BOTTOMLEFT", -16, -4)
+			UIDropDownMenu_SetWidth(dd, 210)
 
-			local size_box = gui.editbox(fonts_panel)
-			gui.set_size(size_box, 52, 24)
-			size_box:SetPoint('LEFT', dd, 'RIGHT', 10, 0)
-			size_box:SetNumeric(false)
-			size_box:SetMaxLetters(2)
+			local sizeBox = CreateFrame("EditBox", "AuxFonts" .. row.key .. "Size", fontsPanel)
+			sizeBox:SetWidth(52)
+			sizeBox:SetHeight(24)
+			sizeBox:SetPoint("LEFT", dd, "RIGHT", 10, 0)
+			sizeBox:SetAutoFocus(false)
+			sizeBox:SetFontObject("GameFontHighlightSmall")
+			sizeBox:SetNumeric(false)
+			sizeBox:SetMaxLetters(2)
+			sizeBox:SetBackdrop({
+				bgFile = "Interface\\ChatFrame\\ChatFrameBackground",
+				edgeFile = "Interface\\ChatFrame\\ChatFrameBorder",
+				tile = true, tileSize = 16, edgeSize = 16,
+				insets = { left = 3, right = 3, top = 3, bottom = 3 }
+			})
+			sizeBox:SetBackdropColor(0, 0, 0, 0.5)
 
 			local function apply_role()
-				-- clamp size
 				local s = tonumber(role_data.size) or 14
 				if s < 8 then s = 8 end
 				if s > 32 then s = 32 end
 				role_data.size = s
-				size_box:SetText(string.format('%d', s))
+				sizeBox:SetText(string.format("%d", s))
 				apply_fonts_now()
 			end
 
@@ -326,53 +303,78 @@ local function build()
 
 			UIDropDownMenu_Initialize(dd, function()
 				for _, name in ipairs(font_list) do
-					UIDropDownMenu_AddButton({
-						text = name,
-						notCheckable = true,
-						func = function() set_font(name) end,
-					})
+					local font_name = name
+					local info = {}
+					info.text = font_name
+					info.notCheckable = true
+					info.func = function()
+						set_font(font_name)
+					end
+					UIDropDownMenu_AddButton(info)
 				end
 			end)
 
 			if role_data.font_name then
 				UIDropDownMenu_SetSelectedName(dd, role_data.font_name)
 			end
-			size_box:SetText(string.format('%d', tonumber(role_data.size) or 14))
-			-- Do not clamp on every keystroke: typing "14" triggers an intermediate
-			-- "1" which would otherwise be forced to the minimum.
-			size_box.change = function()
-				role_data.size = tonumber(this:GetText()) or role_data.size
-			end
-			size_box.enter = function() apply_role() end
-			size_box.focus_loss = function() apply_role() end
+			sizeBox:SetText(string.format("%d", tonumber(role_data.size) or 14))
 
-			local refresh = function()
-				UIDropDownMenu_SetSelectedName(dd, role_data.font_name)
-				size_box:SetText(string.format('%d', tonumber(role_data.size) or 14))
-			end
-			return { _refresh = refresh }
+			sizeBox:SetScript("OnEnterPressed", function()
+				role_data.size = tonumber(sizeBox:GetText()) or role_data.size
+				apply_role()
+				sizeBox:ClearFocus()
+			end)
+
+			sizeBox:SetScript("OnEditFocusLost", function()
+				role_data.size = tonumber(sizeBox:GetText()) or role_data.size
+				apply_role()
+			end)
+
+			tinsert(font_widgets, {
+				dropdown = dd,
+				sizeBox = sizeBox,
+				role_key = row.key,
+			})
 		end
-
-		for i, row in ipairs(rows) do
-			local w = make_row(i, row)
-			if w then tinsert(frame._widgets, w) end
-		end
-
-		apply_fonts_now()
 	end
 
-	frame:SetScript('OnShow', function()
-		ensure_tooltip_settings()
-		for _, w in ipairs(frame._widgets) do
-			if w and w._refresh then w:_refresh() end
+	fontsPanel:SetScript("OnShow", function()
+		if not LSM then return end
+		for _, w in ipairs(font_widgets) do
+			local role_data = fonts_data.roles[w.role_key]
+			UIDropDownMenu_Initialize(w.dropdown, function()
+				for _, name in ipairs(font_list) do
+					local font_name = name
+					local info = {}
+					info.text = font_name
+					info.notCheckable = true
+					info.func = function()
+						role_data.font_name = font_name
+						UIDropDownMenu_SetSelectedName(w.dropdown, font_name)
+						apply_fonts_now()
+					end
+					UIDropDownMenu_AddButton(info)
+				end
+			end)
+			UIDropDownMenu_SetWidth(w.dropdown, 210)
+			if role_data.font_name then
+				UIDropDownMenu_SetSelectedName(w.dropdown, role_data.font_name)
+			end
+			w.sizeBox:SetText(string.format("%d", tonumber(role_data.size) or 14))
 		end
 	end)
-	frame:SetScript('OnHide', function()
-		if frame._apply_fonts_now then frame._apply_fonts_now() end
-	end)
-end
 
-function M.toggle()
-	if not frame then build() end
-	if frame:IsShown() then frame:Hide() else frame:Show() end
+	fontsPanel.default = function()
+		for role, opts in pairs(defaults.roles) do
+			if fonts_data.roles[role] then
+				fonts_data.roles[role].font_name = opts.font_name
+				fonts_data.roles[role].size = opts.size
+				fonts_data.roles[role].outline = opts.outline
+			end
+		end
+		apply_fonts_now()
+		fontsPanel:GetScript("OnShow")(fontsPanel)
+	end
+
+	InterfaceOptions_AddCategory(fontsPanel)
 end
