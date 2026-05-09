@@ -39,8 +39,14 @@ function CLICK_LINK(item_info)
 	execute(nil, false)
 end
 
-function USE_ITEM(_, _, _, _, name)
-	filter = strlower(name) .. '/exact'
+function USE_ITEM(arg1, _, _, _, name)
+	local filter_name
+	if type(arg1) == 'table' then
+		filter_name = arg1.name
+	else
+		filter_name = name
+	end
+	filter = strlower(filter_name) .. '/exact'
 	execute(nil, false)
 end
 

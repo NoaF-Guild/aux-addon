@@ -118,8 +118,13 @@ function CLOSE()
     frame:Hide()
 end
 
-function USE_ITEM(item_id, suffix_id)
-	local key = item_id .. ':' .. suffix_id
+function USE_ITEM(arg1, arg2)
+	local key
+	if type(arg1) == 'table' then
+		key = arg1.item_key
+	else
+		key = arg1 .. ':' .. arg2
+	end
 	select_item(key)
 	if selected_item and selected_item.key == key then return true end
 	update_inventory_records()

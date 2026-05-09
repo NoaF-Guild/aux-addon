@@ -127,6 +127,8 @@ do
 	end
 end
 
+M.get_tab = get_active_tab
+
 local function aux_extract_item(text)
 	if not text then return end
 	local item_id, suffix_id, name

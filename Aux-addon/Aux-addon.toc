@@ -35,6 +35,7 @@ core\Slash.lua
 core\Scan.lua
 core\Stack.lua
 core\Post.lua
+core\shortcut.lua
 core\Tooltip.lua
 
 gui\Listing.lua

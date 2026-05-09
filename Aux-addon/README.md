@@ -9,6 +9,7 @@ Auction House UI replacement.
 
 ### Hotkeys
 - **Shift OR Alt** inserts the item into Aux search (modified item click).
+- **Right-click bag item** while Aux is open: routes to the active tab (Post = select for listing, Search = exact search). Hold Shift/Ctrl/Alt to bypass and use/equip normally.
 - Row actions (works with **Shift OR Alt**):
   - **Search tab**: Left Click = buyout, Right Click = bid
   - **Bids tab**: Left Click = buyout, Right Click = bid
