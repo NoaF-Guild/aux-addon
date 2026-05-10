@@ -44,7 +44,7 @@ function get_duration_code(duration)
 end
 
 
-local settings_schema = {'tuple', '#', {duration='number'}, {start_price='number'}, {buyout_price='number'}, {hidden='boolean'}}
+local settings_schema = {'tuple', '#', {duration='number'}, {start_price='number'}, {buyout_price='number'}, {hidden='boolean'}, {single_stack='boolean'}}
 
 local scan_id, inventory_records, bid_records, buyout_records = 0, {}, {}, {}
 
@@ -52,7 +52,7 @@ local scan_id, inventory_records, bid_records, buyout_records = 0, {}, {}, {}
 local data = {}
 
 function get_default_settings()
-	return O('duration', DURATION_24, 'start_price', 0, 'buyout_price', 0, 'hidden', false)
+	return O('duration', DURATION_24, 'start_price', 0, 'buyout_price', 0, 'hidden', false, 'single_stack', false)
 end
 
 function LOAD2()
@@ -328,6 +328,7 @@ function update_item_configuration()
         deposit:Hide()
         duration_dropdown:Hide()
         hide_checkbox:Hide()
+        single_stack_checkbox:Hide()
     else
 		unit_start_price_input:Show()
         unit_buyout_price_input:Show()
@@ -336,6 +337,7 @@ function update_item_configuration()
         deposit:Show()
         duration_dropdown:Show()
         hide_checkbox:Show()
+        single_stack_checkbox:Show()
 
         item.texture:SetTexture(selected_item.texture)
         item.name:SetText('[' .. selected_item.name .. ']')
@@ -435,6 +437,7 @@ function update_item(item)
     UIDropDownMenu_SetSelectedValue(duration_dropdown, settings.duration)
 
     hide_checkbox:SetChecked(settings.hidden)
+    single_stack_checkbox:SetChecked(settings.single_stack)
 
     if selected_item.max_charges then
 	    for i = selected_item.max_charges, 1, -1 do
@@ -446,7 +449,11 @@ function update_item(item)
     else
 	    stack_size_slider:SetMinMaxValues(1, min(selected_item.max_stack, selected_item.aux_quantity))
     end
-    stack_size_slider:SetValue(huge)
+    if settings.single_stack then
+        stack_size_slider:SetValue(1)
+    else
+        stack_size_slider:SetValue(huge)
+    end
     quantity_update(true)
 
     unit_start_price_input:SetText(money.to_string(settings.start_price, true, nil, nil, true))

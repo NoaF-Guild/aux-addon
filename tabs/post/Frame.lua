@@ -242,6 +242,26 @@ do
 end
 do
     local checkbox = gui.checkbox(frame.parameters)
+    checkbox:SetPoint('LEFT', duration_dropdown, 'RIGHT', 10, 0)
+    checkbox:SetScript('OnClick', function()
+        local settings = read_settings()
+        settings.single_stack = this:GetChecked()
+        write_settings(settings)
+        if settings.single_stack then
+            stack_size_slider:SetValue(1)
+        else
+            stack_size_slider:SetValue(huge)
+        end
+        quantity_update(true)
+        refresh = true
+    end)
+    local label = gui.label(checkbox, gui.font_size.small)
+    label:SetPoint('LEFT', checkbox, 'RIGHT', 4, 1)
+    label:SetText('Sell as singles')
+    single_stack_checkbox = checkbox
+end
+do
+    local checkbox = gui.checkbox(frame.parameters)
     checkbox:SetPoint('TOPRIGHT', -83, -6)
     checkbox:SetScript('OnClick', function()
         local settings = read_settings()
