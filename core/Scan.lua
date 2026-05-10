@@ -94,8 +94,8 @@ function scan()
 		return scan_page()
 	end
 
-	
-	
+	SortAuctionClearSort('list')
+
 	state.dup_query = state.dup_query or {prevPage=nil, numDupPages=0}
 
 	state.query_index = state.query_index and state.query_index + 1 or 1
@@ -172,6 +172,11 @@ function scan_page(i)
 			state.processing_state = KM_PREQUERY
 			return submit_query()
 		else
+			if query.blizzard_query and query.blizzard_query.get_all then
+				if state.items_processed and state.total_auctions and state.items_processed < state.total_auctions then
+					print('GetAll returned ' .. state.items_processed .. ' of ' .. state.total_auctions .. ' auctions — data may be incomplete')
+				end
+			end
 			do (state.params.on_end_query or nop)(query, state.total_auctions, state.page, state.page_is_last) end
 			return scan()
 		end
@@ -182,6 +187,16 @@ function scan_page(i)
 	local auction_info
 	if state.params.type == 'list' and state.params.fast_extract then
 		local link = GetAuctionItemLink('list', i)
+		if not link and query.blizzard_query and query.blizzard_query.get_all then
+			-- Per-item retry for getAll: retry up to 3 times across separate frames
+			state.get_all_retries = state.get_all_retries or {}
+			state.get_all_retries[i] = (state.get_all_retries[i] or 0) + 1
+			if state.get_all_retries[i] <= 3 then
+				return wait(later(0), scan_page, i)
+			end
+			-- After 3 retries, skip this item
+			state.get_all_retries[i] = nil
+		end
 		if link then
 			local item_id, suffix_id = info.parse_link(link)
 			local name, texture, count, _, _, _, _, _, buyout_price, _, _, owner, sale_status = GetAuctionItemInfo('list', i)
@@ -201,6 +216,9 @@ function scan_page(i)
 		end
 	else
 		auction_info = info.auction(i, state.params.type)
+	end
+	if auction_info and query.blizzard_query and query.blizzard_query.get_all then
+		state.items_processed = (state.items_processed or 0) + 1
 	end
 	if auction_info and (auction_info.owner or state.params.ignore_owner or aux_ignore_owner) then
 		auction_info.index = i
@@ -232,9 +250,10 @@ function accept_results()
 	state.processing_state = KM_ANALYZING
 		if query.blizzard_query and query.blizzard_query.get_all then
 			state.page_is_last = true
-			state.get_all_chunk = state.params.chunk_size or 2000
+			state.get_all_chunk = state.params.chunk_size or 500
 			state.get_all_pages = max(ceil((state.total_auctions or 0) / state.get_all_chunk), 1)
 			state.get_all_page = 0
+			state.items_processed = 0
 			return scan_page()
 		end
 	
@@ -273,31 +292,39 @@ function check_for_duplicate_page(q, pagenum)
 
 	local prevPage = q.prevPage
 	local dupPageFound = true
-	local allItemsIdentical = true
+	local numLinks = 0
+	local prevLink
 
 	for i = 1, numOnPage do
-		local name, _, count, _, _, _, minBid, _, buyoutPrice, bidAmount = GetAuctionItemInfo('list', i)
-		local idstr = (name or '') .. '_' .. (count or 0) .. '_' .. (minBid or 0) .. '_' .. (buyoutPrice or 0) .. '_' .. (bidAmount or 0)
+		local name, _, count, _, _, _, minBid, minInc, buyoutPrice, bidAmount, _, owner = GetAuctionItemInfo('list', i)
+		local link = GetAuctionItemLink('list', i) or ''
+		local idstr = link .. '_' .. (count or 0) .. '_' .. (minBid or 0)
+			.. '_' .. (minInc or 0) .. '_' .. (buyoutPrice or 0) .. '_' .. (bidAmount or 0)
+			.. '_' .. (owner or '')
 		thisPage.items[i] = idstr
+
+		if not prevLink then
+			prevLink = link
+		elseif prevLink ~= link then
+			prevLink = link
+			numLinks = numLinks + 1
+		end
 
 		if not prevPage or idstr ~= prevPage.items[i] then
 			dupPageFound = false
-		end
-		if i > 1 and allItemsIdentical and thisPage.items[i] ~= thisPage.items[i-1] then
-			allItemsIdentical = false
 		end
 	end
 
 	if prevPage and prevPage.numOnPage ~= thisPage.numOnPage then
 		dupPageFound = false
-	elseif dupPageFound and allItemsIdentical then
-		
+	elseif dupPageFound and numLinks <= 1 and prevPage and prevPage.numOnPage == numOnPage then
+		-- All items have the same link: probably a wall of identical postings, not a true duplicate
 		dupPageFound = false
 	end
 
 	if dupPageFound then
 		q.numDupPages = (q.numDupPages or 0) + 1
-		
+
 		if q.numDupPages > 3 then
 			q.prevPage = thisPage
 			q.numDupPages = 0
@@ -319,16 +346,35 @@ function wait_for_results()
     end)
     local timeout = later(5, state.last_list_query)
     local ignore_owner = state.params.ignore_owner or aux_ignore_owner
+    local is_getall = query.blizzard_query and query.blizzard_query.get_all
+    local getall_last_num, getall_stable_time
 	return when(function()
 		if not last_update and timeout() then
 			return true
 		end
-		if last_update and GetTime() - last_update > 5 then
-			return true
-		end
-		
-		if updated and (ignore_owner or owner_data_complete()) then
-			return true
+		if last_update then
+			if is_getall then
+				-- #1: Delayed data availability for getAll scans
+				-- Poll until count stabilizes (same value for 0.5s) or exceeds 50
+				local num = GetNumAuctionItems('list')
+				if num > 50 then
+					if not getall_last_num or getall_last_num ~= num then
+						getall_last_num = num
+						getall_stable_time = GetTime()
+					elseif GetTime() - getall_stable_time >= 0.5 then
+						return true  -- stable for 0.5s
+					end
+				end
+				if GetTime() - state.last_list_query > 15 then return true end
+			else
+				-- Normal page scans: original behavior
+				if GetTime() - last_update > 5 then
+					return true
+				end
+				if updated and (ignore_owner or owner_data_complete()) then
+					return true
+				end
+			end
 		end
 		updated = false
 	end, function()
