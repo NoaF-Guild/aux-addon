@@ -70,16 +70,24 @@ This fork adds multiple quality-of-life, safety, and stability improvements to t
 > This addon was edited specifically for ChromieCraft's auction house deposit rate/discount. If it works on other servers, it's a happy coincidence.  
 
 #### Installation
-- If downloading from GitHub via Code → Download ZIP menu, make sure to rename the extracted folder from <code style="color : red">aux-addon-main</code> to <code style="color : green">aux-addon</code> so it matches the folder structure below, otherwise the game won't detect the addon.
+
+The recommended way to install is from the [Releases page](https://github.com/NoaF-Guild/aux-addon/releases):
+
+1. Download the latest release zip (`Aux-addon.zip`).
+2. Extract it into your `Interface/AddOns/` folder. The zip already contains the correctly-named `aux-addon` folder, so no renaming is needed.
+
+Expected folder structure:
   ```
-  └── 📂World of Warcraft/  
-      ├── 📂Interface/  
-      │   └── 📂AddOns/  
-      │       └── 📂aux-addon/  
-      │           └── 📄aux-addon.toc  
-      └── WoW.exe 
+  └── 📂World of Warcraft/
+      ├── 📂Interface/
+      │   └── 📂AddOns/
+      │       └── 📂aux-addon/
+      │           └── 📄aux-addon.toc
+      └── WoW.exe
   ```
- * Alternatively, download the [latest release]([https://github.com/nehswu/aux-addon/](https://github.com/ExoJdi/Aux-addon-improved/releases/]) and extract directly to your AddOns folder.
+
+> [!NOTE]
+> If you download via **Code → Download ZIP**, the extracted folder will be named `aux-addon-master` (or `aux-addon-main`). You **must** rename it to `aux-addon` or the game will not detect the addon.
 
 ***
 ***
