@@ -32,7 +32,7 @@ function LOAD()
 	    local orig = GameTooltip:GetScript'OnTooltipAddMoney'
 	    GameTooltip:SetScript('OnTooltipAddMoney', vararg-function(arg)
 		    if inside_hook then
-			    game_tooltip_money = arg1
+			    game_tooltip_money = arg[1]
 		    else
 			    return orig(unpack(arg))
 		    end

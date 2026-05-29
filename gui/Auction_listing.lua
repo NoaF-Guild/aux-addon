@@ -616,7 +616,7 @@ local methods = {
         end
     end,
 
-    OnHeadColumnClick = function()
+    OnHeadColumnClick = function(_, arg1)
         local button = arg1
         local rt = this.rt
 
@@ -675,7 +675,7 @@ local methods = {
         end
     end,
 
-    OnClick = function()
+    OnClick = function(_, arg1)
         local button = arg1
         if IsControlKeyDown() then
             DressUpItemLink(this.record.link)

@@ -6,7 +6,7 @@ include 'aux'
 local cache = require 'aux.core.cache'
 
 CreateFrame('GameTooltip', 'AuxTooltip', nil, 'GameTooltipTemplate')
-AuxTooltip:SetScript('OnTooltipAddMoney', function()
+AuxTooltip:SetScript('OnTooltipAddMoney', function(_, arg1)
 	this.money = arg1
 end)
 

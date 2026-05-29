@@ -58,7 +58,7 @@ local handlers = {
         end
     end,
 
-    OnClick = function()
+    OnClick = function(_, arg1)
         if not this.data then return end
         local handler = this.st.handlers.OnClick
         if handler then
@@ -66,7 +66,7 @@ local handlers = {
         end
     end,
 
-	OnDoubleClick = function()
+	OnDoubleClick = function(_, arg1)
 		if not this.data then return end
 
 		local handler = this.st.handlers.OnDoubleClick
