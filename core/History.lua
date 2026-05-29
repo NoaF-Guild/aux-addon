@@ -174,3 +174,4 @@ function push_record(item_record)
 	end
 	item_record.next_push, item_record.daily_min_buyout = next_push, nil
 end
+set_LOAD2(LOAD2)

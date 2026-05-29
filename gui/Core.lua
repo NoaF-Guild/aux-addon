@@ -838,3 +838,4 @@ do
 		editbox:ClearFocus()
 	end
 end
+set_LOAD2(LOAD2)

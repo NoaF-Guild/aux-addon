@@ -217,3 +217,5 @@ function M.populate_wdb(item_id)
 	end
 	thread(populate_wdb, item_id + 1)
 end
+set_LOAD(LOAD)
+set_LOAD2(LOAD2)

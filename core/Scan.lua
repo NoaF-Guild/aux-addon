@@ -8,6 +8,12 @@ local history = require 'aux.core.history'
 
 local PAGE_SIZE = 50
 
+local function scan_debug(msg)
+	if _G.aux_scan_debug then
+		print('[AUX SCAN] ' .. msg)
+	end
+end
+
 
 KM_NULL_STATE  = 0
 KM_PREQUERY    = 1
@@ -90,6 +96,7 @@ function last_page(total_auctions)
 end
 
 function scan()
+	scan_debug('scan() entered, type=' .. tostring(state.params.type) .. ' query_index=' .. tostring(state.query_index) .. ' stopped=' .. tostring(state.stopped))
 	if state.params.type ~= 'list' then
 		return scan_page()
 	end
@@ -99,6 +106,7 @@ function scan()
 	state.dup_query = state.dup_query or {prevPage=nil, numDupPages=0}
 
 	state.query_index = state.query_index and state.query_index + 1 or 1
+	scan_debug('scan() query_index=' .. state.query_index .. ' queries=' .. getn(state.params.queries or T))
 	if query and not state.stopped then
 		state.processing_state = KM_PREQUERY
 		state.page_is_last = nil
@@ -107,6 +115,7 @@ function scan()
 			if (query.blizzard_query.first_page or 0) <= (query.blizzard_query.last_page or huge) then
 				state.page = query.blizzard_query.first_page or 0
 				state.processing_state = KM_PREQUERY
+				scan_debug('scan() -> submit_query() page=' .. state.page)
 				return submit_query()
 			end
 		else
@@ -114,14 +123,16 @@ function scan()
 			return scan_page()
 		end
 	end
+	scan_debug('scan() -> complete()')
 	return complete()
 end
 
-do
+	do
 	local function submit()
 		state.processing_state = KM_INQUERY
 		state.last_list_query = GetTime()
 		local blizzard_query = query.blizzard_query or T
+		scan_debug('submit() QueryAuctionItems page=' .. tostring(state.page) .. ' get_all=' .. tostring(blizzard_query.get_all) .. ' name=' .. tostring(blizzard_query.name))
 		QueryAuctionItems(
 			blizzard_query.name,
 			blizzard_query.min_level,
@@ -139,7 +150,11 @@ do
 	end
 	function submit_query()
 		if state.stopped then return end
-		return when(CanSendAuctionQuery, submit)
+		scan_debug('submit_query() waiting for CanSendAuctionQuery')
+		return when(CanSendAuctionQuery, function()
+			scan_debug('CanSendAuctionQuery=true, submitting')
+			return submit()
+		end)
 	end
 end
 
@@ -155,6 +170,9 @@ function scan_page(i)
 			page_size = state.total_auctions
 		end
 		if state.params.type == 'list' and i > page_size then
+		if i == page_size + 1 then
+			scan_debug('scan_page() finished page, total_auctions=' .. tostring(state.total_auctions) .. ' items_processed=' .. tostring(state.items_processed) .. ' page_is_last=' .. tostring(state.page_is_last))
+		end
 		do (state.params.on_page_scanned or nop)() end
 		
 		
@@ -192,9 +210,13 @@ function scan_page(i)
 			state.get_all_retries = state.get_all_retries or {}
 			state.get_all_retries[i] = (state.get_all_retries[i] or 0) + 1
 			if state.get_all_retries[i] <= 3 then
+				if state.get_all_retries[i] == 1 then
+					scan_debug('scan_page() getAll retry item ' .. i .. ' retry=' .. state.get_all_retries[i])
+				end
 				return wait(later(0), scan_page, i)
 			end
 			-- After 3 retries, skip this item
+			scan_debug('scan_page() getAll SKIP item ' .. i .. ' after 3 retries')
 			state.get_all_retries[i] = nil
 		end
 		if link then
@@ -237,6 +259,7 @@ function scan_page(i)
 			local chunk = state.get_all_chunk or 200
 			if chunk > 0 and (i % chunk) == 0 then
 				state.get_all_page = (state.get_all_page or 0) + 1
+				scan_debug('scan_page() getAll chunk boundary, get_all_page=' .. state.get_all_page .. '/' .. (state.get_all_pages or '?'))
 				do (state.params.on_page_loaded or nop)(state.get_all_page, state.get_all_pages or 1, 0) end
 				return wait(later(0), scan_page, i + 1)
 			end
@@ -247,6 +270,7 @@ end
 function accept_results()
 	local num_batch_auctions
 	num_batch_auctions, state.total_auctions = GetNumAuctionItems(state.params.type)
+	scan_debug('accept_results() num_batch=' .. tostring(num_batch_auctions) .. ' total_auctions=' .. tostring(state.total_auctions) .. ' get_all=' .. tostring(query.blizzard_query and query.blizzard_query.get_all))
 	state.processing_state = KM_ANALYZING
 		if query.blizzard_query and query.blizzard_query.get_all then
 			state.page_is_last = true
@@ -254,6 +278,7 @@ function accept_results()
 			state.get_all_pages = max(ceil((state.total_auctions or 0) / state.get_all_chunk), 1)
 			state.get_all_page = 0
 			state.items_processed = 0
+			scan_debug('accept_results() getAll chunk=' .. state.get_all_chunk .. ' pages=' .. state.get_all_pages)
 			return scan_page()
 		end
 	
@@ -263,6 +288,7 @@ function accept_results()
 	end
 	
 	if state.params.type == 'list' and state.dup_query and check_for_duplicate_page(state.dup_query, state.page) then
+		scan_debug('accept_results() duplicate page detected, re-querying')
 		return submit_query()
 	end
 	do
@@ -279,6 +305,7 @@ end
 
 function check_for_duplicate_page(q, pagenum)
 	local numOnPage = GetNumAuctionItems('list')
+	scan_debug('check_for_duplicate_page() pagenum=' .. tostring(pagenum) .. ' numOnPage=' .. numOnPage)
 	local thisPage = {numOnPage = numOnPage, items = {}, pagenum = pagenum}
 
 	if q.prevPage and q.prevPage.pagenum == pagenum then
@@ -324,6 +351,7 @@ function check_for_duplicate_page(q, pagenum)
 
 	if dupPageFound then
 		q.numDupPages = (q.numDupPages or 0) + 1
+		scan_debug('check_for_duplicate_page() DUPLICATE FOUND numDupPages=' .. q.numDupPages)
 
 		if q.numDupPages > 3 then
 			q.prevPage = thisPage
@@ -339,8 +367,10 @@ function check_for_duplicate_page(q, pagenum)
 end
 
 function wait_for_results()
+    scan_debug('wait_for_results() started, last_list_query=' .. tostring(state.last_list_query) .. ' get_all=' .. tostring(query.blizzard_query and query.blizzard_query.get_all))
     local updated, last_update
     local listener_id = event_listener('AUCTION_ITEM_LIST_UPDATE', function()
+        scan_debug('AUCTION_ITEM_LIST_UPDATE fired')
         last_update = GetTime()
         updated = true
     end)
@@ -348,8 +378,10 @@ function wait_for_results()
     local ignore_owner = state.params.ignore_owner or aux_ignore_owner
     local is_getall = query.blizzard_query and query.blizzard_query.get_all
     local getall_last_num, getall_stable_time
+    local condition_printed = false
 	return when(function()
 		if not last_update and timeout() then
+			scan_debug('wait_for_results() timeout (no update), returning true')
 			return true
 		end
 		if last_update then
@@ -359,19 +391,34 @@ function wait_for_results()
 				local num = GetNumAuctionItems('list')
 				if num > 50 then
 					if not getall_last_num or getall_last_num ~= num then
+						if not condition_printed then
+							scan_debug('wait_for_results() getAll num=' .. num .. ' waiting for stability')
+							condition_printed = true
+						end
 						getall_last_num = num
 						getall_stable_time = GetTime()
 					elseif GetTime() - getall_stable_time >= 0.5 then
+						scan_debug('wait_for_results() getAll stable after 0.5s num=' .. num)
 						return true  -- stable for 0.5s
 					end
+				else
+					if not condition_printed then
+						scan_debug('wait_for_results() getAll num=' .. num .. ' <=50, waiting...')
+						condition_printed = true
+					end
 				end
-				if GetTime() - state.last_list_query > 15 then return true end
+				if GetTime() - state.last_list_query > 15 then
+					scan_debug('wait_for_results() getAll 15s timeout')
+					return true
+				end
 			else
 				-- Normal page scans: original behavior
 				if GetTime() - last_update > 5 then
+					scan_debug('wait_for_results() normal 5s post-update timeout')
 					return true
 				end
 				if updated and (ignore_owner or owner_data_complete()) then
+					scan_debug('wait_for_results() normal data ready')
 					return true
 				end
 			end
@@ -380,8 +427,10 @@ function wait_for_results()
 	end, function()
 		kill_listener(listener_id)
 		if not last_update and timeout() then
+			scan_debug('wait_for_results() callback: timeout -> submit_query()')
 			return submit_query()
 		else
+			scan_debug('wait_for_results() callback: accepting results')
 			return accept_results()
 		end
 	end)

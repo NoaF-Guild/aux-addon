@@ -65,6 +65,9 @@ local function handle_command(command)
         print('Item cache cleared.')
     elseif arguments[1] == 'populate' and arguments[2] == 'wdb' then
 	    cache.populate_wdb()
+    elseif arguments[1] == 'debug' and arguments[2] == 'scan' then
+	    _G.aux_scan_debug = not _G.aux_scan_debug
+        print('scan debug ' .. status(_G.aux_scan_debug))
 	else
 		print('Usage:')
 		print('- scale [' .. color.blue(aux_scale) .. ']')
@@ -78,6 +81,7 @@ local function handle_command(command)
 		print('- tooltip disenchant distribution [' .. status(tooltip_settings.disenchant_distribution) .. ']')
 		print('- clear item cache')
 		print('- populate wdb')
+		print('- debug scan [' .. status(_G.aux_scan_debug) .. ']')
     end
 end
 
@@ -120,3 +124,4 @@ do
 	f:RegisterEvent('PLAYER_LOGIN')
 	f:SetScript('OnEvent', register_slash)
 end
+set_LOAD2(LOAD2)

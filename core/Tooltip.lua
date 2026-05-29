@@ -217,3 +217,4 @@ function game_tooltip_hooks:SetAuctionSellItem()
         end
     end
 end
+set_LOAD(LOAD)

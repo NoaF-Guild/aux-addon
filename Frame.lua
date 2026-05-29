@@ -82,3 +82,4 @@ do
 	end)
 	M.blizzard_ui_button = btn
 end
+set_LOAD(LOAD)

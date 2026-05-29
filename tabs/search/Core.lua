@@ -93,3 +93,4 @@ function blizzard_page_index(str)
     end
 end
 
+set_LOAD(LOAD)

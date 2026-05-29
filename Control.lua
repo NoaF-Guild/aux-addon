@@ -121,3 +121,4 @@ M.when = vararg-function(arg)
 		return wait(when, c, k, unpack(arg))
 	end
 end
+set_LOAD(LOAD)

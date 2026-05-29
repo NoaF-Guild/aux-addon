@@ -368,3 +368,4 @@ function LOAD()
 		}
 	end
 end
+set_LOAD(LOAD)

@@ -32,9 +32,15 @@ end
 do
 	local handlers, handlers2 = {}, {}
 	function M.set_LOAD(f)
+		for _, existing in pairs(handlers) do
+			if existing == f then return end
+		end
 		tinsert(handlers, f)
 	end
 	function M.set_LOAD2(f)
+		for _, existing in pairs(handlers2) do
+			if existing == f then return end
+		end
 		tinsert(handlers2, f)
 	end
 	event_frame:SetScript('OnEvent', function()
@@ -47,9 +53,19 @@ do
 				Blizzard_TradeSkillUI()
 			end
 		elseif event == 'VARIABLES_LOADED' then
-			for _, f in pairs(handlers) do f() end
+			for _, f in pairs(handlers) do
+				local ok, err = pcall(f)
+				if not ok then
+					print('Aux LOAD error: ' .. tostring(err))
+				end
+			end
 		elseif event == 'PLAYER_LOGIN' then
-			for _, f in pairs(handlers2) do f() end
+			for _, f in pairs(handlers2) do
+				local ok, err = pcall(f)
+				if not ok then
+					print('Aux LOAD2 error: ' .. tostring(err))
+				end
+			end
 			print('loaded - /aux')
 		else
 			_M[event]()
@@ -99,6 +115,9 @@ do
 		end
 	end
 end
+
+set_LOAD(LOAD)
+set_LOAD2(LOAD2)
 
 tab_info = {}
 function M.TAB(name)
