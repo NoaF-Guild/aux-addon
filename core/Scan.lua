@@ -221,7 +221,7 @@ function scan_page(i)
 		end
 		if link then
 			local item_id, suffix_id = info.parse_link(link)
-			local name, texture, count, _, _, _, _, _, _, buyout_price, _, _, owner, sale_status = GetAuctionItemInfo('list', i)
+			local name, texture, count, _, _, _, _, _, buyout_price, _, _, owner, sale_status = GetAuctionItemInfo('list', i)
 			auction_info = O(
 				'item_key', (tonumber(item_id) or 0) .. ':' .. (tonumber(suffix_id) or 0),
 				'item_id', tonumber(item_id) or 0,
@@ -323,7 +323,7 @@ function check_for_duplicate_page(q, pagenum)
 	local prevLink
 
 	for i = 1, numOnPage do
-		local name, _, count, _, _, _, _, minBid, minInc, buyoutPrice, bidAmount, _, owner = GetAuctionItemInfo('list', i)
+		local name, _, count, _, _, _, minBid, minInc, buyoutPrice, bidAmount, _, owner = GetAuctionItemInfo('list', i)
 		local link = GetAuctionItemLink('list', i) or ''
 		local idstr = link .. '_' .. (count or 0) .. '_' .. (minBid or 0)
 			.. '_' .. (minInc or 0) .. '_' .. (buyoutPrice or 0) .. '_' .. (bidAmount or 0)
