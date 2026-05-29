@@ -48,7 +48,7 @@ function post_auction(slot, k)
 		end)
 
 		local posted
-		event_listener('CHAT_MSG_SYSTEM', function(kill)
+		event_listener('CHAT_MSG_SYSTEM', function(kill, arg1)
 			if arg1 == ERR_AUCTION_STARTED then
 				send_signal()
 				kill()

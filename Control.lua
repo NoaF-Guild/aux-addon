@@ -12,12 +12,12 @@ function LOAD()
 	event_frame:SetScript('OnEvent', EVENT)
 end
 
-function EVENT()
+function EVENT(self, event, arg1, arg2, arg3, arg4, arg5)
 	for id, listener in pairs(listeners) do
 		if listener.killed then
 			listeners[id] = nil
 		elseif event == listener.event then
-			listener.cb(listener.kill)
+			listener.cb(listener.kill, arg1, arg2, arg3, arg4, arg5)
 		end
 	end
 end

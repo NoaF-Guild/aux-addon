@@ -284,7 +284,7 @@ do
 				do (on_success or nop)(confirmed) end
 			end)
 			thread(when, later(5), send_signal)
-			event_listener('CHAT_MSG_SYSTEM', function(kill)
+			event_listener('CHAT_MSG_SYSTEM', function(kill, arg1)
 				if arg1 == ERR_AUCTION_BID_PLACED or arg1 == 'Bid accepted' then
 					confirmed_by_chat = true
 					send_signal()
@@ -308,7 +308,7 @@ do
 			locked = false
 		end)
 		thread(when, later(5), send_signal)
-		event_listener('CHAT_MSG_SYSTEM', function(kill)
+		event_listener('CHAT_MSG_SYSTEM', function(kill, arg1)
 			if arg1 == ERR_AUCTION_REMOVED then
 				send_signal()
 				kill()
