@@ -107,7 +107,7 @@ function M.auction(index, query_type)
         local item_id, suffix_id, unique_id, enchant_id = parse_link(link)
         local item_info = temp-item(item_id, suffix_id, unique_id, enchant_id)
 
-        local name, texture, count, quality, usable, level, _, start_price, min_increment, buyout_price, high_bid, high_bidder, _, owner, _, sale_status = GetAuctionItemInfo(query_type, index)
+        local name, texture, count, quality, usable, level, _, start_price, min_increment, buyout_price, high_bid, high_bidder, owner, sale_status = GetAuctionItemInfo(query_type, index)
 
 		local duration = GetAuctionItemTimeLeft(query_type, index) or 0
 		sale_status = sale_status or 0
