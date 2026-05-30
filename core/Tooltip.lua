@@ -32,7 +32,11 @@ function LOAD()
 	    local orig = GameTooltip:GetScript'OnTooltipAddMoney'
 	    GameTooltip:SetScript('OnTooltipAddMoney', vararg-function(arg)
 		    if inside_hook then
-			    game_tooltip_money = arg1
+			    local money
+			    for i = 1, arg.n do
+				    if type(arg[i]) == 'number' then money = arg[i]; break end
+			    end
+			    game_tooltip_money = money or 0
 		    else
 			    return orig(unpack(arg))
 		    end
@@ -217,3 +221,4 @@ function game_tooltip_hooks:SetAuctionSellItem()
         end
     end
 end
+set_LOAD(LOAD)

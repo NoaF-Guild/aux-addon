@@ -169,3 +169,4 @@ function move_down(list, index)
 		list[index], list[index + 1] = list[index + 1], list[index]
 	end
 end
+set_LOAD2(LOAD2)

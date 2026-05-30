@@ -378,3 +378,4 @@ function LOAD2()
 
 	InterfaceOptions_AddCategory(fontsPanel)
 end
+set_LOAD2(LOAD2)

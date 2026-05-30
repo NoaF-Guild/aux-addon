@@ -620,3 +620,4 @@ function initialize_duration_dropdown()
 	    func = on_click,
     }
 end
+set_LOAD2(LOAD2)

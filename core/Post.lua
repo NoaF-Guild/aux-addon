@@ -39,7 +39,13 @@ function post_auction(slot, k)
 		PickupContainerItem(unpack(slot))
 		ClickAuctionSellItemButton()
 		ClearCursor()
-		StartAuction(max(1, round(state.unit_start_price * item_info.aux_quantity)), round(state.unit_buyout_price * item_info.aux_quantity), state.duration, state.stack_size, 1)
+		local min_bid = max(1, round(state.unit_start_price * item_info.aux_quantity))
+		local buyout_price = round(state.unit_buyout_price * item_info.aux_quantity)
+		if PostAuction then
+			PostAuction(min_bid, buyout_price, state.duration, state.stack_size, 1)
+		else
+			StartAuction(min_bid, buyout_price, state.duration, state.stack_size, 1)
+		end
 
 		local send_signal, signal_received = signal()
 		when(signal_received, function()
@@ -48,7 +54,7 @@ function post_auction(slot, k)
 		end)
 
 		local posted
-		event_listener('CHAT_MSG_SYSTEM', function(kill)
+		event_listener('CHAT_MSG_SYSTEM', function(kill, arg1)
 			if arg1 == ERR_AUCTION_STARTED then
 				send_signal()
 				kill()

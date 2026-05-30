@@ -151,3 +151,4 @@ do
         end
     end
 end
+set_LOAD(LOAD)
