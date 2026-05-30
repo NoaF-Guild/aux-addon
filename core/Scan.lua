@@ -150,9 +150,16 @@ end
 	end
 	function submit_query()
 		if state.stopped then return end
-		scan_debug('submit_query() waiting for CanSendAuctionQuery')
-		return when(CanSendAuctionQuery, function()
-			scan_debug('CanSendAuctionQuery=true, submitting')
+		local is_getall = query.blizzard_query and query.blizzard_query.get_all
+		-- For getAll queries the engine also requires the 2nd return value of
+		-- CanSendAuctionQuery (canQueryAll); querying when it is false fails
+		-- silently (no AUCTION_ITEM_LIST_UPDATE), which previously hung the scan.
+		local ready = is_getall
+			and function() local can, can_all = CanSendAuctionQuery(); return can and can_all end
+			or CanSendAuctionQuery
+		scan_debug('submit_query() waiting for CanSendAuctionQuery getall=' .. tostring(is_getall))
+		return when(ready, function()
+			scan_debug('CanSendAuctionQuery ready, submitting')
 			return submit()
 		end)
 	end
@@ -367,7 +374,49 @@ function check_for_duplicate_page(q, pagenum)
 end
 
 function wait_for_results()
-    scan_debug('wait_for_results() started, last_list_query=' .. tostring(state.last_list_query) .. ' get_all=' .. tostring(query.blizzard_query and query.blizzard_query.get_all))
+    local is_getall = query.blizzard_query and query.blizzard_query.get_all
+    scan_debug('wait_for_results() started, last_list_query=' .. tostring(state.last_list_query) .. ' get_all=' .. tostring(is_getall))
+
+    if is_getall then
+        -- getAll path (modeled on TSM LibAuctionScan): do NOT depend on
+        -- AUCTION_ITEM_LIST_UPDATE (it is unreliable / sometimes never fires
+        -- for getAll on this core). Instead poll GetNumAuctionItems('list')
+        -- until data is available, with a hard timeout. NEVER resubmit a
+        -- getAll query on timeout -- accept whatever is present and move on,
+        -- otherwise the scan loops forever (the "fast scan hangs" bug).
+        local GETALL_TIMEOUT = 20
+        local getall_last_num, getall_stable_time
+        local waiting_printed, ready_printed = false, false
+        return when(function()
+            local num = GetNumAuctionItems('list')
+            if num and num > 50 then
+                -- wait for the count to stabilize for 0.5s before accepting
+                if not getall_last_num or getall_last_num ~= num then
+                    if not ready_printed then
+                        scan_debug('wait_for_results() getAll num=' .. num .. ' waiting for stability')
+                        ready_printed = true
+                    end
+                    getall_last_num = num
+                    getall_stable_time = GetTime()
+                elseif GetTime() - getall_stable_time >= 0.5 then
+                    scan_debug('wait_for_results() getAll stable num=' .. num)
+                    return true
+                end
+            elseif not waiting_printed then
+                scan_debug('wait_for_results() getAll num=' .. tostring(num) .. ' <=50, polling...')
+                waiting_printed = true
+            end
+            if GetTime() - state.last_list_query > GETALL_TIMEOUT then
+                scan_debug('wait_for_results() getAll ' .. GETALL_TIMEOUT .. 's timeout, accepting')
+                return true
+            end
+        end, function()
+            scan_debug('wait_for_results() getAll callback: accepting results')
+            return accept_results()
+        end)
+    end
+
+    -- Normal paged scans: original event-driven behavior.
     local updated, last_update
     local listener_id = event_listener('AUCTION_ITEM_LIST_UPDATE', function()
         scan_debug('AUCTION_ITEM_LIST_UPDATE fired')
@@ -376,51 +425,19 @@ function wait_for_results()
     end)
     local timeout = later(5, state.last_list_query)
     local ignore_owner = state.params.ignore_owner or aux_ignore_owner
-    local is_getall = query.blizzard_query and query.blizzard_query.get_all
-    local getall_last_num, getall_stable_time
-    local condition_printed = false
 	return when(function()
 		if not last_update and timeout() then
 			scan_debug('wait_for_results() timeout (no update), returning true')
 			return true
 		end
 		if last_update then
-			if is_getall then
-				-- #1: Delayed data availability for getAll scans
-				-- Poll until count stabilizes (same value for 0.5s) or exceeds 50
-				local num = GetNumAuctionItems('list')
-				if num > 50 then
-					if not getall_last_num or getall_last_num ~= num then
-						if not condition_printed then
-							scan_debug('wait_for_results() getAll num=' .. num .. ' waiting for stability')
-							condition_printed = true
-						end
-						getall_last_num = num
-						getall_stable_time = GetTime()
-					elseif GetTime() - getall_stable_time >= 0.5 then
-						scan_debug('wait_for_results() getAll stable after 0.5s num=' .. num)
-						return true  -- stable for 0.5s
-					end
-				else
-					if not condition_printed then
-						scan_debug('wait_for_results() getAll num=' .. num .. ' <=50, waiting...')
-						condition_printed = true
-					end
-				end
-				if GetTime() - state.last_list_query > 15 then
-					scan_debug('wait_for_results() getAll 15s timeout')
-					return true
-				end
-			else
-				-- Normal page scans: original behavior
-				if GetTime() - last_update > 5 then
-					scan_debug('wait_for_results() normal 5s post-update timeout')
-					return true
-				end
-				if updated and (ignore_owner or owner_data_complete()) then
-					scan_debug('wait_for_results() normal data ready')
-					return true
-				end
+			if GetTime() - last_update > 5 then
+				scan_debug('wait_for_results() normal 5s post-update timeout')
+				return true
+			end
+			if updated and (ignore_owner or owner_data_complete()) then
+				scan_debug('wait_for_results() normal data ready')
+				return true
 			end
 		end
 		updated = false
