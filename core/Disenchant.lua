@@ -64,7 +64,7 @@ function M.distribution(slot, quality, level)
     if quality == UNCOMMON then
         if level <= 10 then
             return temp-A(
-	            -O('item_id', 10940, 'min_quantity', 1, 'max_quantity', 2, 'probability', p(.8, .2)),
+	            temp-O('item_id', 10940, 'min_quantity', 1, 'max_quantity', 2, 'probability', p(.8, .2)),
 	            temp-O('item_id', 10938, 'min_quantity', 1, 'max_quantity', 2, 'probability', p(.2, .8))
             )
         elseif level <= 15 then
